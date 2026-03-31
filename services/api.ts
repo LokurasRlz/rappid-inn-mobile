@@ -158,8 +158,11 @@ export const diagnoseEwelinkDevices = () => api.get('/doors/diagnose_ewelink');
 export const getEwelinkAuthUrl = () => api.get('/doors/ewelink_auth_url');
 
 export const validateStoreQr = (mode: DoorMode, qrData: string, orderId?: number, location?: string) =>
-  mode === 'exit'
-    ? openExitDoor(orderId || 0, qrData, location)
-    : openEntryDoor(qrData, location);
+  api.post('/doors/validate', {
+    mode,
+    qr_data: qrData,
+    order_id: orderId,
+    location,
+  });
 
 export default api;

@@ -33,6 +33,8 @@ export default function QrAccessScreen() {
   const [permission, requestPermission] = useCameraPermissions();
   const [doorState, setDoorState] = useState<DoorState>('idle');
   const [scanned, setScanned] = useState(false);
+  const [accessReady, setAccessReady] = useState(false);
+  const [lastQrData, setLastQrData] = useState<string | null>(null);
   const [storeCode, setStoreCode] = useState('rapid-inn-main');
   const [loadingStoreCode, setLoadingStoreCode] = useState(true);
   const [showEntryQr, setShowEntryQr] = useState(false);
@@ -142,6 +144,8 @@ export default function QrAccessScreen() {
   const resetDoorState = (delayMs: number) => {
     setTimeout(() => {
       setScanned(false);
+      setAccessReady(false);
+      setLastQrData(null);
       setDoorState('idle');
     }, delayMs);
   };
@@ -153,14 +157,15 @@ export default function QrAccessScreen() {
     setDoorState('opening');
 
     try {
-      await validateStoreQr('entry', data, undefined, 'entry-qr-scan');
-      setDoorState('opened');
+      await validateStoreQr('entry', data, undefined, 'entry-qr-scan-validation');
+      setAccessReady(true);
+      setLastQrData(data);
+      setDoorState('idle');
       Toast.show({
         type: 'success',
-        text1: 'Puerta habilitada',
-        text2: 'Ya podes ingresar a la tienda',
+        text1: 'QR valido',
+        text2: 'Ahora puedes tocar Abrir puerta',
       });
-      resetDoorState(5000);
     } catch (error: any) {
       setDoorState('error');
       Toast.show({
@@ -176,7 +181,7 @@ export default function QrAccessScreen() {
     setDoorState('opening');
 
     try {
-      await openEntryDoor(undefined, 'manual-entry-button');
+      await openEntryDoor(lastQrData || undefined, accessReady ? 'entry-qr-button' : 'manual-entry-button');
       setDoorState('opened');
       Toast.show({
         type: 'success',
@@ -275,7 +280,8 @@ export default function QrAccessScreen() {
               )}
             </View>
             <Text style={styles.scanHint}>
-              {doorState === 'idle' && 'Escanea el QR de entrada'}
+              {doorState === 'idle' && !accessReady && 'Escanea el QR de entrada'}
+              {doorState === 'idle' && accessReady && 'QR validado. Puedes abrir la puerta'}
               {doorState === 'opening' && 'Enviando autorizacion...'}
               {doorState === 'opened' && 'Puerta habilitada'}
               {doorState === 'error' && 'Acceso denegado'}
@@ -292,11 +298,16 @@ export default function QrAccessScreen() {
               Si ya estas autenticado, tambien podes mandar la senal manualmente sin escanear.
             </Text>
             <Button
-              label={doorState === 'opening' ? 'Abriendo...' : 'Abrir puerta'}
+              label={doorState === 'opening' ? 'Abriendo...' : accessReady ? 'Abrir puerta' : 'Abrir puerta manualmente'}
               onPress={handleManualOpen}
               loading={doorState === 'opening'}
               disabled={doorState === 'opening'}
             />
+            {accessReady && (
+              <TouchableOpacity onPress={() => { setAccessReady(false); setScanned(false); setLastQrData(null); }}>
+                <Text style={styles.resetLink}>Escanear otro QR</Text>
+              </TouchableOpacity>
+            )}
           </View>
 
           {user?.role === 'admin' && (
@@ -306,6 +317,7 @@ export default function QrAccessScreen() {
                 Para conectar eWeLink abre esta URL en el navegador y completa el login una sola vez:
               </Text>
               <Text style={styles.adminPanelCode}>{setupUrl}</Text>
+              <Text style={styles.adminPanelCode}>QR imprimible: http://192.168.3.104:3000/door_qr/entry</Text>
               <TouchableOpacity style={styles.debugBtn} onPress={checkEwelinkStatus}>
                 <Text style={styles.debugBtnText}>Ver estado del token</Text>
               </TouchableOpacity>
@@ -518,6 +530,12 @@ const styles = StyleSheet.create({
     color: Colors.textSecondary,
     fontSize: FontSizes.sm,
     lineHeight: 20,
+  },
+  resetLink: {
+    color: Colors.primary,
+    fontSize: FontSizes.sm,
+    fontWeight: FontWeights.semibold,
+    textAlign: 'center',
   },
   qrCard: {
     backgroundColor: Colors.surface,
