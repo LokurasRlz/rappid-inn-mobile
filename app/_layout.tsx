@@ -1,45 +1,16 @@
 import { useEffect } from 'react';
-import * as Linking from 'expo-linking';
-import { Stack, router } from 'expo-router';
+import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
+import Toast from 'react-native-toast-message';
 
 import { useAuthStore } from '../services/authStore';
 
 export default function RootLayout() {
-  const { completeExternalAuth, loadToken } = useAuthStore();
+  const { loadToken } = useAuthStore();
 
   useEffect(() => {
     loadToken();
   }, [loadToken]);
-
-  useEffect(() => {
-    const handleUrl = async (url: string | null) => {
-      if (!url) return;
-
-      const parsed = Linking.parse(url);
-      const token = typeof parsed.queryParams?.token === 'string'
-        ? parsed.queryParams.token
-        : null;
-
-      if (parsed.path === 'auth/callback' && token) {
-        try {
-          await completeExternalAuth(token);
-          router.replace('/(app)/home');
-        } catch {
-          router.replace('/(auth)/login');
-        }
-      }
-    };
-
-    Linking.getInitialURL().then(handleUrl);
-    const subscription = Linking.addEventListener('url', ({ url }) => {
-      handleUrl(url);
-    });
-
-    return () => {
-      subscription.remove();
-    };
-  }, [completeExternalAuth]);
 
   return (
     <>
@@ -49,6 +20,7 @@ export default function RootLayout() {
         <Stack.Screen name="(auth)" />
         <Stack.Screen name="(app)" />
       </Stack>
+      <Toast />
     </>
   );
 }

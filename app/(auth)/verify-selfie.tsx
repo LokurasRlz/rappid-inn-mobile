@@ -1,13 +1,15 @@
-import { useState, useRef } from 'react';
-import {
-  View, Text, TouchableOpacity, StyleSheet,
-  SafeAreaView, Alert, ActivityIndicator, Image,
-} from 'react-native';
+import React, { useState, useRef } from 'react';
+import { View, Text, TouchableOpacity, StyleSheet, Image, ActivityIndicator } from 'react-native';
 import { CameraView, useCameraPermissions } from 'expo-camera';
+import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
+import Toast from 'react-native-toast-message';
+import ScreenWrapper from '../../components/ui/ScreenWrapper';
+import Button from '../../components/ui/Button';
+import Card from '../../components/ui/Card';
 import { uploadSelfie, autoVerify } from '../../services/api';
 import { useAuthStore } from '../../services/authStore';
-import { Colors, Spacing, FontSizes, BorderRadius, Shadows } from '../../constants/theme';
+import { Colors, Spacing, FontSizes, FontWeights, BorderRadius, Shadows } from '../../constants/theme';
 
 export default function VerifySelfieScreen() {
   const [permission, requestPermission] = useCameraPermissions();
@@ -21,36 +23,29 @@ export default function VerifySelfieScreen() {
     if (!cameraRef.current) return;
     setLoading(true);
     try {
-      const photo = await cameraRef.current.takePictureAsync({ base64: true, quality: 0.6 });
+      const photo = await cameraRef.current.takePictureAsync({ base64: true, quality: 0.65 });
       setSelfieUri(photo.uri);
       await uploadSelfie(photo.base64 || '');
-      await refreshUser();
+      Toast.show({ type: 'success', text1: '✓ Selfie capturada' });
       setShowCamera(false);
     } catch {
-      Alert.alert('Error', 'No se pudo capturar la selfie');
+      Toast.show({ type: 'error', text1: 'Error al capturar la selfie' });
     } finally {
       setLoading(false);
     }
   };
 
   const handleFinish = async () => {
-    if (!selfieUri) {
-      Alert.alert('Falta selfie', 'Primero tomá tu foto');
-      return;
-    }
+    if (!selfieUri) { Toast.show({ type: 'error', text1: 'Primero tomá tu selfie' }); return; }
     setLoading(true);
     try {
       await autoVerify();
       updateVerification('verified');
       await refreshUser();
-      Alert.alert(
-        '¡Cuenta verificada! 🎉',
-        'Tu identidad fue confirmada. Ya podés usar Rapid Inn.',
-        [{ text: 'Empezar', onPress: () => router.replace('/(app)/home') }],
-      );
+      Toast.show({ type: 'success', text1: '¡Cuenta verificada! 🎉', text2: 'Ya podés acceder a Rapid Inn', visibilityTime: 3000 });
+      setTimeout(() => router.replace('/(app)/home'), 2000);
     } catch (e: any) {
-      const msg = e?.response?.data?.error || 'Faltan documentos';
-      Alert.alert('Error', msg);
+      Toast.show({ type: 'error', text1: 'Error', text2: e?.response?.data?.error || 'Faltan documentos' });
     } finally {
       setLoading(false);
     }
@@ -59,27 +54,26 @@ export default function VerifySelfieScreen() {
   if (showCamera) {
     if (!permission?.granted) {
       return (
-        <SafeAreaView style={styles.container}>
-          <View style={styles.center}>
-            <Text style={styles.permText}>Necesitamos acceso a la cámara frontal</Text>
-            <TouchableOpacity style={styles.btn} onPress={requestPermission}>
-              <Text style={styles.btnText}>Permitir</Text>
-            </TouchableOpacity>
+        <ScreenWrapper>
+          <View style={styles.permContainer}>
+            <Ionicons name="camera-reverse-outline" size={64} color={Colors.primary} />
+            <Text style={styles.permTitle}>Cámara frontal</Text>
+            <Button label="Permitir" onPress={requestPermission} fullWidth={false} />
           </View>
-        </SafeAreaView>
+        </ScreenWrapper>
       );
     }
     return (
       <View style={{ flex: 1 }}>
         <CameraView ref={cameraRef} style={{ flex: 1 }} facing="front">
           <View style={styles.cameraOverlay}>
-            <View style={styles.faceFrame} />
-            <Text style={styles.cameraHint}>Mirá a la cámara y sonreí</Text>
+            <TouchableOpacity style={styles.closeBtn} onPress={() => setShowCamera(false)}>
+              <Ionicons name="close-circle" size={32} color="#fff" />
+            </TouchableOpacity>
+            <View style={styles.faceGuide} />
+            <Text style={styles.camHint}>Mirá a la cámara y sonreí 😊</Text>
             <TouchableOpacity style={styles.captureBtn} onPress={takeSelfie} disabled={loading}>
               {loading ? <ActivityIndicator color="#fff" /> : <View style={styles.captureInner} />}
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.cancelBtn} onPress={() => setShowCamera(false)}>
-              <Text style={styles.cancelText}>Cancelar</Text>
             </TouchableOpacity>
           </View>
         </CameraView>
@@ -88,136 +82,92 @@ export default function VerifySelfieScreen() {
   }
 
   return (
-    <SafeAreaView style={styles.container}>
+    <ScreenWrapper>
       <View style={styles.inner}>
         <TouchableOpacity style={styles.back} onPress={() => router.back()}>
-          <Text style={styles.backText}>← Volver</Text>
+          <Ionicons name="arrow-back" size={20} color={Colors.textSecondary} />
+          <Text style={styles.backText}>Volver</Text>
         </TouchableOpacity>
 
         <View style={styles.header}>
           <Text style={styles.title}>Selfie de verificación</Text>
-          <Text style={styles.subtitle}>
-            Tomá una foto de tu cara para confirmar que sos vos
-          </Text>
+          <Text style={styles.subtitle}>Tomá una foto de tu cara para confirmar tu identidad</Text>
         </View>
 
-        {/* Selfie preview or placeholder */}
-        <TouchableOpacity style={styles.selfieCard} onPress={() => setShowCamera(true)}>
+        <TouchableOpacity style={styles.selfieContainer} onPress={() => setShowCamera(true)}>
           {selfieUri ? (
-            <Image source={{ uri: selfieUri }} style={styles.selfieImage} />
+            <>
+              <Image source={{ uri: selfieUri }} style={styles.selfieImage} />
+              <View style={styles.retakeOverlay}>
+                <Ionicons name="camera-reverse-outline" size={24} color="#fff" />
+                <Text style={styles.retakeText}>Repetir</Text>
+              </View>
+            </>
           ) : (
             <View style={styles.selfiePlaceholder}>
-              <Text style={styles.selfieIcon}>🤳</Text>
+              <Ionicons name="person-circle-outline" size={72} color={Colors.textMuted} />
               <Text style={styles.selfieHint}>Toca para tomar selfie</Text>
             </View>
           )}
-          {selfieUri && (
-            <View style={styles.retakeOverlay}>
-              <Text style={styles.retakeText}>Toca para repetir</Text>
+        </TouchableOpacity>
+
+        <Card style={styles.tipsCard} variant="flat">
+          {[
+            { icon: 'sunny-outline', text: 'Buena iluminación en tu cara' },
+            { icon: 'eye-outline', text: 'Mirá directamente a la cámara' },
+            { icon: 'happy-outline', text: 'Rostro descubierto, sin gafas de sol' },
+          ].map((tip, i) => (
+            <View key={i} style={styles.tipRow}>
+              <Ionicons name={tip.icon as any} size={18} color={Colors.primary} />
+              <Text style={styles.tipText}>{tip.text}</Text>
             </View>
-          )}
-        </TouchableOpacity>
+          ))}
+        </Card>
 
-        {/* Tips */}
-        <View style={styles.tips}>
-          <TipRow icon="💡" text="Buena iluminación en tu cara" />
-          <TipRow icon="👀" text="Mirá directamente a la cámara" />
-          <TipRow icon="😐" text="Rostro descubierto, sin gafas de sol" />
-        </View>
-
-        <TouchableOpacity
-          style={[styles.finishBtn, (!selfieUri || loading) && styles.finishBtnDisabled]}
-          onPress={handleFinish}
-          disabled={!selfieUri || loading}
-        >
-          {loading
-            ? <ActivityIndicator color="#fff" />
-            : <Text style={styles.finishBtnText}>
-                {selfieUri ? 'Finalizar verificación ✓' : 'Tomá tu selfie primero'}
-              </Text>
-          }
-        </TouchableOpacity>
+        <Button
+          label={selfieUri ? '¡Finalizar verificación!' : 'Tomar selfie primero'}
+          onPress={selfieUri ? handleFinish : () => setShowCamera(true)}
+          loading={loading}
+          variant={selfieUri ? 'success' : 'primary'}
+          size="lg"
+          style={{ marginTop: 'auto' as any, marginBottom: Spacing.lg }}
+        />
       </View>
-    </SafeAreaView>
-  );
-}
-
-function TipRow({ icon, text }: { icon: string; text: string }) {
-  return (
-    <View style={styles.tipRow}>
-      <Text style={styles.tipIcon}>{icon}</Text>
-      <Text style={styles.tipText}>{text}</Text>
-    </View>
+    </ScreenWrapper>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: Colors.background },
   inner: { flex: 1, paddingHorizontal: Spacing.lg },
-  center: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: Spacing.md },
-  permText: { fontSize: FontSizes.md, color: Colors.text },
-  btn: {
-    backgroundColor: Colors.primary, borderRadius: BorderRadius.md,
-    paddingHorizontal: Spacing.xl, paddingVertical: 12,
-  },
-  btnText: { color: '#fff', fontWeight: '700' },
-  back: { marginTop: Spacing.md },
-  backText: { color: Colors.primary, fontSize: FontSizes.md, fontWeight: '600' },
-  header: { marginTop: Spacing.lg, marginBottom: Spacing.lg },
-  title: { fontSize: FontSizes.xxl, fontWeight: '800', color: Colors.text },
-  subtitle: { fontSize: FontSizes.md, color: Colors.textSecondary, marginTop: 4, lineHeight: 22 },
-  selfieCard: {
-    width: 220, height: 220, borderRadius: 110, overflow: 'hidden',
+  permContainer: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: Spacing.md },
+  permTitle: { fontSize: FontSizes.xl, fontWeight: FontWeights.bold, color: Colors.text },
+  back: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: Spacing.md },
+  backText: { fontSize: FontSizes.md, color: Colors.textSecondary, fontWeight: FontWeights.medium },
+  header: { marginTop: Spacing.xl, marginBottom: Spacing.lg, gap: 4 },
+  title: { fontSize: FontSizes.xxl, fontWeight: FontWeights.extrabold, color: Colors.text },
+  subtitle: { fontSize: FontSizes.md, color: Colors.textSecondary, lineHeight: 22 },
+  selfieContainer: {
+    width: 200, height: 200, borderRadius: 100, overflow: 'hidden',
     alignSelf: 'center', borderWidth: 3, borderColor: Colors.primary,
-    backgroundColor: Colors.borderLight, marginVertical: Spacing.xl,
+    backgroundColor: Colors.backgroundAlt, marginVertical: Spacing.xl,
     ...Shadows.md,
   },
   selfieImage: { width: '100%', height: '100%' },
-  selfiePlaceholder: {
-    flex: 1, alignItems: 'center', justifyContent: 'center', gap: Spacing.sm,
-  },
-  selfieIcon: { fontSize: 56 },
-  selfieHint: { fontSize: FontSizes.sm, color: Colors.textSecondary, fontWeight: '600' },
+  selfiePlaceholder: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 8 },
+  selfieHint: { fontSize: FontSizes.sm, color: Colors.textSecondary, fontWeight: FontWeights.medium },
   retakeOverlay: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(0,0,0,0.4)',
-    alignItems: 'center', justifyContent: 'flex-end',
-    paddingBottom: Spacing.md,
+    ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,0.45)',
+    alignItems: 'center', justifyContent: 'flex-end', paddingBottom: 16, gap: 4,
   },
-  retakeText: { color: '#fff', fontSize: FontSizes.sm, fontWeight: '700' },
-  tips: { gap: Spacing.sm, marginBottom: Spacing.xl },
-  tipRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.sm },
-  tipIcon: { fontSize: 18, width: 28, textAlign: 'center' },
+  retakeText: { color: '#fff', fontSize: FontSizes.sm, fontWeight: FontWeights.bold },
+  tipsCard: { padding: Spacing.md, gap: Spacing.sm, marginBottom: Spacing.md },
+  tipRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
   tipText: { fontSize: FontSizes.sm, color: Colors.textSecondary },
-  finishBtn: {
-    backgroundColor: Colors.secondary, borderRadius: BorderRadius.md,
-    paddingVertical: 16, alignItems: 'center', ...Shadows.md,
-  },
-  finishBtnDisabled: { backgroundColor: Colors.border },
-  finishBtnText: { color: '#fff', fontSize: FontSizes.lg, fontWeight: '700' },
   // Camera
-  cameraOverlay: {
-    flex: 1, alignItems: 'center', justifyContent: 'center', paddingBottom: 60, gap: Spacing.md,
-  },
-  faceFrame: {
-    width: 200, height: 240, borderWidth: 2.5,
-    borderColor: '#fff', borderRadius: 100, borderStyle: 'dashed',
-  },
-  cameraHint: {
-    color: '#fff', fontSize: FontSizes.md, fontWeight: '600',
-    textShadowColor: 'rgba(0,0,0,0.8)', textShadowRadius: 4,
-    textShadowOffset: { width: 0, height: 1 },
-  },
-  captureBtn: {
-    width: 72, height: 72, borderRadius: 36,
-    borderWidth: 4, borderColor: '#fff',
-    alignItems: 'center', justifyContent: 'center', marginTop: Spacing.xl,
-  },
+  cameraOverlay: { flex: 1, alignItems: 'center', justifyContent: 'space-between', paddingVertical: 48, backgroundColor: 'rgba(0,0,0,0.3)' },
+  closeBtn: { alignSelf: 'flex-end', paddingRight: 24 },
+  faceGuide: { width: 220, height: 264, borderRadius: 110, borderWidth: 2.5, borderColor: '#fff', borderStyle: 'dashed' },
+  camHint: { color: '#fff', fontSize: FontSizes.md, fontWeight: FontWeights.semibold, opacity: 0.9 },
+  captureBtn: { width: 72, height: 72, borderRadius: 36, borderWidth: 4, borderColor: '#fff', alignItems: 'center', justifyContent: 'center' },
   captureInner: { width: 56, height: 56, borderRadius: 28, backgroundColor: '#fff' },
-  cancelBtn: { marginTop: Spacing.md },
-  cancelText: {
-    color: '#fff', fontSize: FontSizes.md, fontWeight: '600',
-    textShadowColor: 'rgba(0,0,0,0.8)', textShadowRadius: 4,
-    textShadowOffset: { width: 0, height: 1 },
-  },
 });

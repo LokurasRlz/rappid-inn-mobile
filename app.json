@@ -16,7 +16,7 @@
       "supportsTablet": false,
       "bundleIdentifier": "com.tuempresa.supermarketapp",
       "infoPlist": {
-        "NSCameraUsageDescription": "Necesitamos acceso a la cámara para escanear códigos de barras y QR.",
+        "NSCameraUsageDescription": "Necesitamos acceso a la camara para escanear codigos de barras y QR.",
         "NSPhotoLibraryUsageDescription": "Necesitamos acceso a tus fotos para actualizar tu perfil."
       }
     },
@@ -37,7 +37,7 @@
       "favicon": "./assets/images/favicon.png",
       "name": "SuperMercado App",
       "shortName": "SuperApp",
-      "description": "Tu supermercado autónomo",
+      "description": "Tu supermercado autonomo",
       "themeColor": "#1B5E20",
       "backgroundColor": "#FFFFFF"
     },
@@ -47,13 +47,7 @@
       [
         "expo-camera",
         {
-          "cameraPermission": "Permitir acceso a la cámara para escanear productos."
-        }
-      ],
-      [
-        "expo-barcode-scanner",
-        {
-          "cameraPermission": "Permitir acceso a la cámara para escanear códigos de barras."
+          "cameraPermission": "Permitir acceso a la camara para escanear productos."
         }
       ]
     ],

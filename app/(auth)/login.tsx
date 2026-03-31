@@ -1,22 +1,15 @@
 import { useState } from 'react';
-import {
-  View,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  StyleSheet,
-  SafeAreaView,
-  KeyboardAvoidingView,
-  Platform,
-  Alert,
-  ActivityIndicator,
-} from 'react-native';
+import { Alert, KeyboardAvoidingView, Platform, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import * as WebBrowser from 'expo-web-browser';
 import { router } from 'expo-router';
 
+import Button from '../../components/ui/Button';
+import Card from '../../components/ui/Card';
+import Input from '../../components/ui/Input';
+import ScreenWrapper from '../../components/ui/ScreenWrapper';
+import { BorderRadius, Colors, FontSizes, FontWeights, Shadows, Spacing } from '../../constants/theme';
+import { getGoogleAuthUrl, getGoogleRedirectUri } from '../../services/api';
 import { useAuthStore } from '../../services/authStore';
-import { BorderRadius, Colors, FontSizes, Shadows, Spacing } from '../../constants/theme';
-import { GOOGLE_AUTH_URL } from '../../services/api';
 import { getVerificationRoute } from '../../services/verificationFlow';
 
 export default function LoginScreen() {
@@ -27,7 +20,7 @@ export default function LoginScreen() {
 
   const handleLogin = async () => {
     if (!email || !password) {
-      Alert.alert('Error', 'Completa email y contrasena.');
+      Alert.alert('Datos incompletos', 'Ingresa email y contraseña para continuar.');
       return;
     }
 
@@ -36,7 +29,7 @@ export default function LoginScreen() {
       await login(email.trim().toLowerCase(), password);
       router.replace(getVerificationRoute(useAuthStore.getState().user) as any);
     } catch (error: any) {
-      Alert.alert('Error', error?.response?.data?.error || 'No se pudo iniciar sesion.');
+      Alert.alert('No pudimos iniciar sesión', error?.response?.data?.error || 'Revisa tus credenciales.');
     } finally {
       setLoading(false);
     }
@@ -44,136 +37,74 @@ export default function LoginScreen() {
 
   const handleGoogle = async () => {
     if (Platform.OS === 'web') {
-      Alert.alert('Google en web', 'Usa email por ahora o adapta el callback web del backend.');
+      window.location.assign(getGoogleAuthUrl());
       return;
     }
 
-    await WebBrowser.openBrowserAsync(GOOGLE_AUTH_URL);
+    const redirectUri = getGoogleRedirectUri();
+    await WebBrowser.openAuthSessionAsync(getGoogleAuthUrl(), redirectUri);
   };
 
   return (
-    <SafeAreaView style={styles.container}>
-      <KeyboardAvoidingView
-        style={styles.inner}
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-      >
+    <ScreenWrapper>
+      <KeyboardAvoidingView style={styles.container} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
         <TouchableOpacity onPress={() => router.back()}>
           <Text style={styles.backText}>Volver</Text>
         </TouchableOpacity>
 
-        <View style={styles.header}>
-          <Text style={styles.title}>Iniciar sesion</Text>
-          <Text style={styles.subtitle}>
-            Accede con tu cuenta o continua con Google.
+        <View style={styles.hero}>
+          <Text style={styles.heroTitle}>Entrar</Text>
+          <Text style={styles.heroSubtitle}>
+            Accede a tu cuenta para continuar con compras, acceso QR y pagos.
           </Text>
         </View>
 
-        <View style={styles.form}>
-          <Text style={styles.label}>Email</Text>
-          <TextInput
-            style={styles.input}
-            value={email}
-            onChangeText={setEmail}
-            keyboardType="email-address"
-            autoCapitalize="none"
-            placeholder="nombre@email.com"
-            placeholderTextColor={Colors.textMuted}
-          />
+        <Card variant="elevated" style={styles.formCard}>
+          <Input label="Email" value={email} onChangeText={setEmail} placeholder="nombre@email.com" keyboardType="email-address" />
+          <Input label="Contraseña" value={password} onChangeText={setPassword} placeholder="********" secureTextEntry />
 
-          <Text style={styles.label}>Contrasena</Text>
-          <TextInput
-            style={styles.input}
-            value={password}
-            onChangeText={setPassword}
-            secureTextEntry
-            placeholder="********"
-            placeholderTextColor={Colors.textMuted}
-          />
+          <Button label="Iniciar sesión" onPress={handleLogin} loading={loading} />
+          <Button label="Continuar con Google" variant="outline" onPress={handleGoogle} />
+        </Card>
 
-          <TouchableOpacity style={styles.primaryButton} onPress={handleLogin} disabled={loading}>
-            {loading ? <ActivityIndicator color="#fff" /> : <Text style={styles.primaryButtonText}>Entrar</Text>}
-          </TouchableOpacity>
-
-          <TouchableOpacity style={styles.secondaryButton} onPress={handleGoogle}>
-            <Text style={styles.secondaryButtonText}>Continuar con Google</Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity style={styles.linkButton} onPress={() => router.replace('/(auth)/register')}>
-            <Text style={styles.linkText}>Crear cuenta con email</Text>
-          </TouchableOpacity>
-        </View>
+        <TouchableOpacity style={styles.linkButton} onPress={() => router.replace('/(auth)/register')}>
+          <Text style={styles.linkText}>Crear cuenta con email</Text>
+        </TouchableOpacity>
       </KeyboardAvoidingView>
-    </SafeAreaView>
+    </ScreenWrapper>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: Colors.background },
-  inner: { flex: 1, padding: Spacing.lg },
+  container: {
+    flex: 1,
+    padding: Spacing.md,
+    justifyContent: 'center',
+    gap: Spacing.lg,
+  },
   backText: {
     color: Colors.primary,
     fontSize: FontSizes.md,
-    fontWeight: '700',
-    marginTop: Spacing.md,
+    fontWeight: FontWeights.bold,
   },
-  header: {
-    marginTop: Spacing.xl,
-    marginBottom: Spacing.xl,
+  hero: {
     gap: Spacing.sm,
   },
-  title: {
+  heroTitle: {
     color: Colors.text,
-    fontSize: 34,
-    fontWeight: '800',
+    fontSize: 40,
+    fontWeight: FontWeights.extrabold,
   },
-  subtitle: {
+  heroSubtitle: {
     color: Colors.textSecondary,
     fontSize: FontSizes.md,
-    lineHeight: 22,
+    lineHeight: 24,
+    maxWidth: 320,
   },
-  form: {
-    gap: Spacing.sm,
-  },
-  label: {
-    color: Colors.text,
-    fontSize: FontSizes.sm,
-    fontWeight: '700',
-  },
-  input: {
-    backgroundColor: Colors.surface,
-    borderRadius: BorderRadius.md,
-    borderWidth: 1,
-    borderColor: Colors.border,
-    paddingHorizontal: Spacing.md,
-    paddingVertical: 14,
-    color: Colors.text,
-    fontSize: FontSizes.md,
-    ...Shadows.sm,
-  },
-  primaryButton: {
-    marginTop: Spacing.md,
-    backgroundColor: Colors.primary,
-    borderRadius: BorderRadius.md,
-    paddingVertical: 16,
-    alignItems: 'center',
-  },
-  primaryButtonText: {
-    color: '#fff',
-    fontSize: FontSizes.md,
-    fontWeight: '800',
-  },
-  secondaryButton: {
-    borderWidth: 1,
-    borderColor: Colors.border,
-    borderRadius: BorderRadius.md,
-    paddingVertical: 16,
-    alignItems: 'center',
-    backgroundColor: Colors.surface,
-  },
-  secondaryButtonText: {
-    color: Colors.text,
-    fontSize: FontSizes.md,
-    fontWeight: '700',
+  formCard: {
+    gap: Spacing.md,
+    padding: Spacing.lg,
+    ...Shadows.lg,
   },
   linkButton: {
     alignItems: 'center',
@@ -182,6 +113,6 @@ const styles = StyleSheet.create({
   linkText: {
     color: Colors.primary,
     fontSize: FontSizes.md,
-    fontWeight: '700',
+    fontWeight: FontWeights.bold,
   },
 });

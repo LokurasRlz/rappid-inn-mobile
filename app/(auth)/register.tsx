@@ -1,21 +1,13 @@
 import { useState } from 'react';
-import {
-  View,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  StyleSheet,
-  SafeAreaView,
-  KeyboardAvoidingView,
-  Platform,
-  Alert,
-  ActivityIndicator,
-  ScrollView,
-} from 'react-native';
+import { Alert, KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { router } from 'expo-router';
 
+import Button from '../../components/ui/Button';
+import Card from '../../components/ui/Card';
+import Input from '../../components/ui/Input';
+import ScreenWrapper from '../../components/ui/ScreenWrapper';
+import { BorderRadius, Colors, FontSizes, FontWeights, Shadows, Spacing } from '../../constants/theme';
 import { useAuthStore } from '../../services/authStore';
-import { BorderRadius, Colors, FontSizes, Shadows, Spacing } from '../../constants/theme';
 
 export default function RegisterScreen() {
   const [step, setStep] = useState(1);
@@ -32,17 +24,17 @@ export default function RegisterScreen() {
 
   const handleStep1 = () => {
     if (!name || !email || !password || !confirmPassword) {
-      Alert.alert('Error', 'Completa todos los campos del primer paso.');
+      Alert.alert('Datos incompletos', 'Completa los campos del primer paso.');
       return;
     }
 
     if (password !== confirmPassword) {
-      Alert.alert('Error', 'Las contraseñas no coinciden.');
+      Alert.alert('Contraseñas distintas', 'La confirmación no coincide.');
       return;
     }
 
     if (password.length < 6) {
-      Alert.alert('Error', 'La contraseña debe tener al menos 6 caracteres.');
+      Alert.alert('Contraseña corta', 'Usa al menos 6 caracteres.');
       return;
     }
 
@@ -51,17 +43,16 @@ export default function RegisterScreen() {
 
   const handleRegister = async () => {
     if (!dni || !birthDate || !phone) {
-      Alert.alert('Error', 'Completa DNI, fecha de nacimiento y teléfono.');
+      Alert.alert('Datos incompletos', 'Completa DNI, fecha de nacimiento y teléfono.');
       return;
     }
 
     if (dni.trim().length < 7 || dni.trim().length > 10) {
-      Alert.alert('Error', 'El DNI debe tener entre 7 y 10 dígitos.');
+      Alert.alert('DNI inválido', 'El DNI debe tener entre 7 y 10 dígitos.');
       return;
     }
 
     setLoading(true);
-
     try {
       await register({
         name: name.trim(),
@@ -74,190 +65,138 @@ export default function RegisterScreen() {
 
       router.replace('/(auth)/verify-doc');
     } catch (error: any) {
-      Alert.alert('Error', error?.response?.data?.error || 'No se pudo crear la cuenta.');
+      Alert.alert('No pudimos crear la cuenta', error?.response?.data?.error || 'Intenta nuevamente.');
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <SafeAreaView style={styles.container}>
-      <KeyboardAvoidingView
-        style={{ flex: 1 }}
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-      >
-        <ScrollView contentContainerStyle={styles.inner} keyboardShouldPersistTaps="handled">
-          <TouchableOpacity style={styles.back} onPress={() => (step === 2 ? setStep(1) : router.back())}>
+    <ScreenWrapper>
+      <KeyboardAvoidingView style={styles.container} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+        <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
+          <TouchableOpacity onPress={() => (step === 2 ? setStep(1) : router.back())}>
             <Text style={styles.backText}>{step === 2 ? 'Anterior' : 'Volver'}</Text>
           </TouchableOpacity>
 
-          <View style={styles.progress}>
-            <View style={[styles.progressDot, styles.progressDotActive]} />
-            <View style={[styles.progressLine, step >= 2 && styles.progressLineActive]} />
-            <View style={[styles.progressDot, step >= 2 && styles.progressDotActive]} />
-          </View>
-
           <View style={styles.header}>
-            <Text style={styles.stepLabel}>Paso {step} de 2</Text>
-            <Text style={styles.title}>
-              {step === 1 ? 'Crear cuenta' : 'Datos personales'}
-            </Text>
+            <Text style={styles.stepText}>Paso {step} de 2</Text>
+            <Text style={styles.title}>{step === 1 ? 'Crear tu cuenta' : 'Validar identidad'}</Text>
             <Text style={styles.subtitle}>
               {step === 1
-                ? 'Primero definimos tus credenciales.'
-                : 'Luego completamos los datos para validarte.'}
+                ? 'Primero definimos tus credenciales de acceso.'
+                : 'Luego te pedimos los datos base para el flujo de verificación.'}
             </Text>
           </View>
 
-          {step === 1 ? (
-            <View style={styles.form}>
-              <Field label="Nombre completo" value={name} onChange={setName} placeholder="Juan Perez" />
-              <Field
-                label="Email"
-                value={email}
-                onChange={setEmail}
-                placeholder="tu@email.com"
-                keyboard="email-address"
-                autoCapitalize="none"
-              />
-              <Field label="Contraseña" value={password} onChange={setPassword} placeholder="Minimo 6 caracteres" secure />
-              <Field
-                label="Confirmar contraseña"
-                value={confirmPassword}
-                onChange={setConfirmPassword}
-                placeholder="Repite tu contraseña"
-                secure
-              />
+          <View style={styles.progress}>
+            <View style={[styles.progressFill, { width: step === 1 ? '50%' : '100%' }]} />
+          </View>
 
-              <TouchableOpacity style={styles.button} onPress={handleStep1}>
-                <Text style={styles.buttonText}>Continuar</Text>
-              </TouchableOpacity>
-            </View>
-          ) : (
-            <View style={styles.form}>
-              <Field label="DNI" value={dni} onChange={setDni} placeholder="12345678" keyboard="number-pad" />
-              <Field label="Fecha de nacimiento" value={birthDate} onChange={setBirthDate} placeholder="1990-05-20" />
-              <Field label="Telefono" value={phone} onChange={setPhone} placeholder="+54 9 11 1234-5678" keyboard="phone-pad" />
+          <Card variant="elevated" style={styles.formCard}>
+            {step === 1 ? (
+              <>
+                <Input label="Nombre completo" value={name} onChangeText={setName} placeholder="Juan Perez" />
+                <Input label="Email" value={email} onChangeText={setEmail} placeholder="tu@email.com" keyboardType="email-address" />
+                <Input label="Contraseña" value={password} onChangeText={setPassword} placeholder="Minimo 6 caracteres" secureTextEntry />
+                <Input label="Confirmar contraseña" value={confirmPassword} onChangeText={setConfirmPassword} placeholder="Repite la contraseña" secureTextEntry />
+                <Button label="Continuar" onPress={handleStep1} />
+              </>
+            ) : (
+              <>
+                <Input label="DNI" value={dni} onChangeText={setDni} placeholder="12345678" keyboardType="number-pad" />
+                <Input label="Fecha de nacimiento" value={birthDate} onChangeText={setBirthDate} placeholder="1990-05-20" />
+                <Input label="Telefono" value={phone} onChangeText={setPhone} placeholder="+54 9 11 1234-5678" keyboardType="phone-pad" />
+                <Card variant="flat" style={styles.noticeCard}>
+                  <Text style={styles.noticeTitle}>Siguiente paso</Text>
+                  <Text style={styles.noticeText}>
+                    Después del alta continuarás con DNI frente/dorso, OTP por SMS y selfie.
+                  </Text>
+                </Card>
+                <Button label="Crear cuenta" onPress={handleRegister} loading={loading} />
+              </>
+            )}
+          </Card>
 
-              <View style={styles.notice}>
-                <Text style={styles.noticeText}>
-                  Después del alta vas a continuar con DNI, OTP y selfie para quedar verificado.
-                </Text>
-              </View>
-
-              <TouchableOpacity style={[styles.button, loading && styles.buttonDisabled]} onPress={handleRegister} disabled={loading}>
-                {loading ? <ActivityIndicator color="#fff" /> : <Text style={styles.buttonText}>Crear cuenta</Text>}
-              </TouchableOpacity>
-            </View>
-          )}
-
-          <TouchableOpacity style={styles.loginLink} onPress={() => router.replace('/(auth)/login')}>
-            <Text style={styles.loginText}>
-              ¿Ya tienes cuenta? <Text style={styles.loginBold}>Inicia sesión</Text>
-            </Text>
+          <TouchableOpacity style={styles.linkButton} onPress={() => router.replace('/(auth)/login')}>
+            <Text style={styles.linkText}>Ya tengo cuenta</Text>
           </TouchableOpacity>
         </ScrollView>
       </KeyboardAvoidingView>
-    </SafeAreaView>
-  );
-}
-
-interface FieldProps {
-  label: string;
-  value: string;
-  onChange: (value: string) => void;
-  placeholder?: string;
-  secure?: boolean;
-  keyboard?: any;
-  autoCapitalize?: any;
-}
-
-function Field({
-  label,
-  value,
-  onChange,
-  placeholder,
-  secure,
-  keyboard,
-  autoCapitalize,
-}: FieldProps) {
-  return (
-    <View style={styles.field}>
-      <Text style={styles.label}>{label}</Text>
-      <TextInput
-        style={styles.input}
-        value={value}
-        onChangeText={onChange}
-        placeholder={placeholder}
-        secureTextEntry={secure}
-        keyboardType={keyboard}
-        autoCapitalize={autoCapitalize || 'words'}
-        placeholderTextColor={Colors.textMuted}
-      />
-    </View>
+    </ScreenWrapper>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: Colors.background },
-  inner: { paddingHorizontal: Spacing.lg, paddingBottom: Spacing.xxl },
-  back: { marginTop: Spacing.md },
-  backText: { color: Colors.primary, fontSize: FontSizes.md, fontWeight: '700' },
-  progress: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginTop: Spacing.md,
-    marginBottom: Spacing.sm,
-  },
-  progressDot: {
-    width: 12,
-    height: 12,
-    borderRadius: 6,
-    backgroundColor: Colors.border,
-  },
-  progressDotActive: { backgroundColor: Colors.primary },
-  progressLine: {
+  container: {
     flex: 1,
-    height: 2,
-    backgroundColor: Colors.border,
-    marginHorizontal: 4,
   },
-  progressLineActive: { backgroundColor: Colors.primary },
-  header: { marginBottom: Spacing.xl },
-  stepLabel: { fontSize: FontSizes.sm, color: Colors.primary, fontWeight: '700', marginBottom: 4 },
-  title: { fontSize: FontSizes.xxl, fontWeight: '800', color: Colors.text },
-  subtitle: { fontSize: FontSizes.md, color: Colors.textSecondary, marginTop: 4 },
-  form: { gap: Spacing.md },
-  field: { gap: 6 },
-  label: { fontSize: FontSizes.sm, fontWeight: '700', color: Colors.text },
-  input: {
-    backgroundColor: Colors.surface,
-    borderRadius: BorderRadius.md,
-    paddingHorizontal: Spacing.md,
-    paddingVertical: 14,
-    fontSize: FontSizes.md,
-    color: Colors.text,
-    borderWidth: 1.5,
-    borderColor: Colors.border,
-    ...Shadows.sm,
-  },
-  button: {
-    backgroundColor: Colors.primary,
-    borderRadius: BorderRadius.md,
-    paddingVertical: 16,
-    alignItems: 'center',
-    marginTop: Spacing.sm,
-    ...Shadows.md,
-  },
-  buttonDisabled: { opacity: 0.6 },
-  buttonText: { color: '#fff', fontSize: FontSizes.lg, fontWeight: '800' },
-  notice: {
-    backgroundColor: Colors.primaryLight,
-    borderRadius: BorderRadius.md,
+  scroll: {
     padding: Spacing.md,
+    gap: Spacing.md,
+    paddingBottom: Spacing.xxl,
   },
-  noticeText: { fontSize: FontSizes.sm, color: Colors.primary, lineHeight: 20 },
-  loginLink: { marginTop: Spacing.xl, alignItems: 'center' },
-  loginText: { fontSize: FontSizes.md, color: Colors.textSecondary },
-  loginBold: { color: Colors.primary, fontWeight: '800' },
+  backText: {
+    color: Colors.primary,
+    fontSize: FontSizes.md,
+    fontWeight: FontWeights.bold,
+  },
+  header: {
+    gap: Spacing.sm,
+  },
+  stepText: {
+    color: Colors.primary,
+    fontSize: FontSizes.xs,
+    fontWeight: FontWeights.bold,
+    textTransform: 'uppercase',
+    letterSpacing: 1.2,
+  },
+  title: {
+    color: Colors.text,
+    fontSize: 38,
+    fontWeight: FontWeights.extrabold,
+  },
+  subtitle: {
+    color: Colors.textSecondary,
+    fontSize: FontSizes.md,
+    lineHeight: 24,
+  },
+  progress: {
+    height: 8,
+    borderRadius: BorderRadius.full,
+    backgroundColor: Colors.borderLight,
+    overflow: 'hidden',
+  },
+  progressFill: {
+    height: '100%',
+    backgroundColor: Colors.primary,
+    borderRadius: BorderRadius.full,
+  },
+  formCard: {
+    gap: Spacing.md,
+    padding: Spacing.lg,
+    ...Shadows.lg,
+  },
+  noticeCard: {
+    gap: 6,
+  },
+  noticeTitle: {
+    color: Colors.text,
+    fontSize: FontSizes.sm,
+    fontWeight: FontWeights.bold,
+  },
+  noticeText: {
+    color: Colors.textSecondary,
+    fontSize: FontSizes.sm,
+    lineHeight: 20,
+  },
+  linkButton: {
+    alignItems: 'center',
+    paddingVertical: Spacing.sm,
+  },
+  linkText: {
+    color: Colors.primary,
+    fontSize: FontSizes.md,
+    fontWeight: FontWeights.bold,
+  },
 });

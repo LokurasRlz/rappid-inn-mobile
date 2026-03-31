@@ -1,8 +1,9 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as SecureStore from 'expo-secure-store';
-import { create } from 'zustand';
+import { create } from 'zustand/index.js';
 
 import { RegisterPayload, getMe, signIn, signOut, signUp } from './api';
+import { useCartStore } from './cartStore';
 
 const AUTH_TOKEN_KEY = 'auth_token';
 
@@ -132,6 +133,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     }
 
     await clearStoredToken();
+    useCartStore.setState({ items: [], total: 0, count: 0, summary: null, isLoading: false });
     set({ user: null, token: null, isAuthenticated: false });
   },
 

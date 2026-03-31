@@ -1,6 +1,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import Constants from 'expo-constants';
 import * as SecureStore from 'expo-secure-store';
+import * as Linking from 'expo-linking';
 import { Platform } from 'react-native';
 import axios from 'axios';
 
@@ -35,7 +36,24 @@ function resolveApiUrl() {
 }
 
 export const API_URL = resolveApiUrl();
-export const GOOGLE_AUTH_URL = `${API_URL}/auth/google_oauth2`;
+
+export function getGoogleRedirectUri() {
+  if (Platform.OS === 'web') {
+    const origin = typeof window !== 'undefined' ? window.location.origin : 'http://localhost:8081';
+    return `${origin}/auth/callback`;
+  }
+
+  return Linking.createURL('auth/callback');
+}
+
+export function getGoogleAuthUrl() {
+  const redirectUri = getGoogleRedirectUri();
+  const authBaseUrl = Platform.OS === 'web'
+    ? API_URL.replace('127.0.0.1:3000', 'localhost:3000')
+    : API_URL;
+
+  return `${authBaseUrl}/auth/google_oauth2?client_redirect_uri=${encodeURIComponent(redirectUri)}`;
+}
 
 const api = axios.create({
   baseURL: API_URL,
@@ -135,6 +153,9 @@ export const openExitDoor = (orderId: number, qrData?: string, location?: string
   api.post('/doors/exit', { order_id: orderId, qr_data: qrData, location });
 
 export const getDoorStatus = () => api.get('/doors/status');
+export const getEwelinkStatus = () => api.get('/doors/test_ewelink');
+export const diagnoseEwelinkDevices = () => api.get('/doors/diagnose_ewelink');
+export const getEwelinkAuthUrl = () => api.get('/doors/ewelink_auth_url');
 
 export const validateStoreQr = (mode: DoorMode, qrData: string, orderId?: number, location?: string) =>
   mode === 'exit'

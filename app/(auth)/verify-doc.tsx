@@ -1,24 +1,24 @@
-import { useState, useRef } from 'react';
-import {
-  View, Text, TouchableOpacity, StyleSheet,
-  SafeAreaView, Alert, ActivityIndicator, Image,
-} from 'react-native';
+import React, { useState, useRef } from 'react';
+import { View, Text, TouchableOpacity, StyleSheet, Image, Animated } from 'react-native';
 import { CameraView, useCameraPermissions } from 'expo-camera';
+import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
+import Toast from 'react-native-toast-message';
+import ScreenWrapper from '../../components/ui/ScreenWrapper';
+import Button from '../../components/ui/Button';
+import Card from '../../components/ui/Card';
 import { uploadDocument } from '../../services/api';
-import { useAuthStore } from '../../services/authStore';
-import { Colors, Spacing, FontSizes, BorderRadius, Shadows } from '../../constants/theme';
+import { Colors, Spacing, FontSizes, FontWeights, BorderRadius, Shadows } from '../../constants/theme';
 
 type DocSide = 'front' | 'back';
 
 export default function VerifyDocScreen() {
-  const { refreshUser } = useAuthStore();
   const [permission, requestPermission] = useCameraPermissions();
   const [step, setStep] = useState<DocSide>('front');
   const [frontUri, setFrontUri] = useState<string | null>(null);
   const [backUri, setBackUri] = useState<string | null>(null);
-  const [loading, setLoading] = useState(false);
   const [showCamera, setShowCamera] = useState(false);
+  const [loading, setLoading] = useState(false);
   const cameraRef = useRef<any>(null);
 
   const takePicture = async () => {
@@ -29,59 +29,53 @@ export default function VerifyDocScreen() {
       if (step === 'front') {
         setFrontUri(photo.uri);
         await uploadDocument('front', photo.base64 || '');
+        Toast.show({ type: 'success', text1: '✓ Frente capturado' });
+        setShowCamera(false);
+        setTimeout(() => { setStep('back'); setShowCamera(true); }, 400);
       } else {
         setBackUri(photo.uri);
         await uploadDocument('back', photo.base64 || '');
+        Toast.show({ type: 'success', text1: '✓ Dorso capturado' });
+        setShowCamera(false);
       }
-      await refreshUser();
-      setShowCamera(false);
-    } catch (e) {
-      Alert.alert('Error', 'No se pudo capturar la imagen');
+    } catch {
+      Toast.show({ type: 'error', text1: 'Error al capturar la imagen' });
     } finally {
       setLoading(false);
     }
   };
 
-  const handleNext = () => {
-    if (!frontUri) {
-      Alert.alert('Falta foto', 'Capturá el frente del DNI');
-      return;
-    }
-    if (!backUri) {
-      setStep('back');
-      setShowCamera(true);
-      return;
-    }
-    router.push('/(auth)/verify-otp');
-  };
-
   if (showCamera) {
     if (!permission?.granted) {
       return (
-        <SafeAreaView style={styles.container}>
-          <View style={styles.center}>
-            <Text style={styles.permText}>Se necesita acceso a la cámara</Text>
-            <TouchableOpacity style={styles.btn} onPress={requestPermission}>
-              <Text style={styles.btnText}>Permitir cámara</Text>
-            </TouchableOpacity>
+        <ScreenWrapper>
+          <View style={styles.permContainer}>
+            <Ionicons name="camera-outline" size={64} color={Colors.primary} />
+            <Text style={styles.permTitle}>Cámara necesaria</Text>
+            <Button label="Permitir acceso" onPress={requestPermission} fullWidth={false} />
           </View>
-        </SafeAreaView>
+        </ScreenWrapper>
       );
     }
-
     return (
       <View style={{ flex: 1 }}>
         <CameraView ref={cameraRef} style={{ flex: 1 }} facing="back">
           <View style={styles.cameraOverlay}>
-            <View style={styles.docFrame} />
-            <Text style={styles.cameraHint}>
-              {step === 'front' ? 'Encuadrá el frente de tu DNI' : 'Encuadrá el dorso de tu DNI'}
-            </Text>
+            <View style={styles.camHeader}>
+              <Text style={styles.camTitle}>{step === 'front' ? 'Frente del DNI' : 'Dorso del DNI'}</Text>
+              <TouchableOpacity onPress={() => setShowCamera(false)}>
+                <Ionicons name="close-circle" size={32} color="#fff" />
+              </TouchableOpacity>
+            </View>
+            <View style={styles.docFrame}>
+              <View style={[styles.corner, styles.cTL]} />
+              <View style={[styles.corner, styles.cTR]} />
+              <View style={[styles.corner, styles.cBL]} />
+              <View style={[styles.corner, styles.cBR]} />
+            </View>
+            <Text style={styles.camHint}>Encuadrá el DNI dentro del marco</Text>
             <TouchableOpacity style={styles.captureBtn} onPress={takePicture} disabled={loading}>
-              {loading ? <ActivityIndicator color="#fff" /> : <View style={styles.captureInner} />}
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.cancelBtn} onPress={() => setShowCamera(false)}>
-              <Text style={styles.cancelText}>Cancelar</Text>
+              <View style={styles.captureInner} />
             </TouchableOpacity>
           </View>
         </CameraView>
@@ -90,165 +84,131 @@ export default function VerifyDocScreen() {
   }
 
   return (
-    <SafeAreaView style={styles.container}>
+    <ScreenWrapper>
       <View style={styles.inner}>
         <TouchableOpacity style={styles.back} onPress={() => router.back()}>
-          <Text style={styles.backText}>← Volver</Text>
+          <Ionicons name="arrow-back" size={20} color={Colors.textSecondary} />
+          <Text style={styles.backText}>Volver</Text>
         </TouchableOpacity>
 
         <View style={styles.header}>
-          <Text style={styles.title}>Verificación de identidad</Text>
-          <Text style={styles.subtitle}>Necesitamos una foto de tu DNI por ambos lados</Text>
+          <View style={styles.iconWrap}>
+            <Ionicons name="card-outline" size={36} color={Colors.primary} />
+          </View>
+          <Text style={styles.title}>Foto de DNI</Text>
+          <Text style={styles.subtitle}>Necesitamos una foto de tu documento por ambos lados</Text>
         </View>
 
-        {/* Front */}
-        <DocCard
-          label="Frente del DNI"
-          uri={frontUri}
-          done={!!frontUri}
-          onCapture={() => {
-            setStep('front');
-            setShowCamera(true);
-          }}
-        />
+        <View style={styles.steps}>
+          <DocStep
+            number={1}
+            label="Frente del DNI"
+            description="La cara con tu foto y nombre"
+            uri={frontUri}
+            onCapture={() => { setStep('front'); setShowCamera(true); }}
+            done={!!frontUri}
+          />
+          <View style={styles.stepConnector} />
+          <DocStep
+            number={2}
+            label="Dorso del DNI"
+            description="La parte trasera del documento"
+            uri={backUri}
+            onCapture={() => { if (!frontUri) { Toast.show({ type: 'error', text1: 'Primero capturá el frente' }); return; } setStep('back'); setShowCamera(true); }}
+            done={!!backUri}
+            disabled={!frontUri}
+          />
+        </View>
 
-        {/* Back */}
-        <DocCard
-          label="Dorso del DNI"
-          uri={backUri}
-          done={!!backUri}
-          onCapture={() => {
-            if (!frontUri) {
-              Alert.alert('Primero capturá el frente');
-              return;
-            }
-            setStep('back');
-            setShowCamera(true);
-          }}
-          disabled={!frontUri}
-        />
-
-        <TouchableOpacity
-          style={[styles.nextBtn, (!frontUri || !backUri) && styles.nextBtnDisabled]}
-          onPress={handleNext}
-        >
-          <Text style={styles.nextBtnText}>
-            {!frontUri ? 'Capturar frente →'
-              : !backUri ? 'Capturar dorso →'
-              : 'Continuar →'}
-          </Text>
-        </TouchableOpacity>
-
-        <Text style={styles.tip}>
-          💡 Asegurate de que el texto sea legible y no haya reflejos
-        </Text>
+        <View style={styles.footer}>
+          <View style={styles.tipRow}>
+            <Ionicons name="bulb-outline" size={16} color={Colors.warning} />
+            <Text style={styles.tipText}>Asegurate de que el texto sea legible y sin reflejos</Text>
+          </View>
+          <Button
+            label={!frontUri ? 'Capturar frente →' : !backUri ? 'Capturar dorso →' : 'Continuar →'}
+            onPress={() => {
+              if (!frontUri) { setStep('front'); setShowCamera(true); }
+              else if (!backUri) { setStep('back'); setShowCamera(true); }
+              else router.push('/(auth)/verify-otp');
+            }}
+            size="lg"
+            variant={frontUri && backUri ? 'success' : 'primary'}
+          />
+        </View>
       </View>
-    </SafeAreaView>
+    </ScreenWrapper>
   );
 }
 
-function DocCard({
-  label, uri, done, onCapture, disabled,
-}: {
-  label: string; uri: string | null; done: boolean;
-  onCapture: () => void; disabled?: boolean;
-}) {
+function DocStep({ number, label, description, uri, onCapture, done, disabled }: any) {
   return (
-    <TouchableOpacity
-      style={[styles.card, done && styles.cardDone, disabled && styles.cardDisabled]}
-      onPress={onCapture}
-      disabled={disabled}
-    >
+    <TouchableOpacity style={[styles.docStep, done && styles.docStepDone, disabled && styles.docStepDisabled]} onPress={onCapture} disabled={disabled}>
+      <View style={[styles.stepNum, done && styles.stepNumDone]}>
+        {done ? <Ionicons name="checkmark" size={16} color="#fff" /> : <Text style={[styles.stepNumText, done && { color: '#fff' }]}>{number}</Text>}
+      </View>
+      <View style={{ flex: 1 }}>
+        <Text style={[styles.stepLabel, done && styles.stepLabelDone]}>{label}</Text>
+        <Text style={styles.stepDesc}>{description}</Text>
+        {done && <Text style={styles.stepCaptured}>Capturado ✓</Text>}
+      </View>
       {uri ? (
-        <Image source={{ uri }} style={styles.cardImage} resizeMode="cover" />
+        <Image source={{ uri }} style={styles.thumb} />
       ) : (
-        <View style={styles.cardPlaceholder}>
-          <Text style={styles.cardIcon}>{done ? '✅' : '📷'}</Text>
+        <View style={styles.thumbPlaceholder}>
+          <Ionicons name="camera" size={22} color={disabled ? Colors.textMuted : Colors.primary} />
         </View>
       )}
-      <View style={styles.cardInfo}>
-        <Text style={styles.cardLabel}>{label}</Text>
-        <Text style={[styles.cardStatus, done && styles.cardStatusDone]}>
-          {done ? 'Capturado ✓' : disabled ? 'Primero el frente' : 'Toca para capturar'}
-        </Text>
-      </View>
     </TouchableOpacity>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: Colors.background },
   inner: { flex: 1, paddingHorizontal: Spacing.lg },
-  center: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: Spacing.md },
-  permText: { fontSize: FontSizes.md, color: Colors.text },
-  btn: {
-    backgroundColor: Colors.primary, borderRadius: BorderRadius.md,
-    paddingHorizontal: Spacing.xl, paddingVertical: 12,
-  },
-  btnText: { color: '#fff', fontWeight: '700' },
-  back: { marginTop: Spacing.md },
-  backText: { color: Colors.primary, fontSize: FontSizes.md, fontWeight: '600' },
-  header: { marginTop: Spacing.lg, marginBottom: Spacing.xl },
-  title: { fontSize: FontSizes.xxl, fontWeight: '800', color: Colors.text },
-  subtitle: { fontSize: FontSizes.md, color: Colors.textSecondary, marginTop: 4 },
-  card: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: Colors.surface,
-    borderRadius: BorderRadius.lg,
-    padding: Spacing.md,
-    marginBottom: Spacing.md,
-    borderWidth: 2,
-    borderColor: Colors.border,
+  permContainer: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: Spacing.md },
+  permTitle: { fontSize: FontSizes.xl, fontWeight: FontWeights.bold, color: Colors.text },
+  back: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: Spacing.md },
+  backText: { fontSize: FontSizes.md, color: Colors.textSecondary, fontWeight: FontWeights.medium },
+  header: { alignItems: 'center', marginVertical: Spacing.xl, gap: Spacing.sm },
+  iconWrap: { width: 72, height: 72, borderRadius: 24, backgroundColor: Colors.primaryLight, alignItems: 'center', justifyContent: 'center', marginBottom: Spacing.sm },
+  title: { fontSize: FontSizes.xxl, fontWeight: FontWeights.extrabold, color: Colors.text },
+  subtitle: { fontSize: FontSizes.md, color: Colors.textSecondary, textAlign: 'center', lineHeight: 22 },
+  steps: { gap: 0, marginBottom: Spacing.xl },
+  stepConnector: { height: 20, width: 2, backgroundColor: Colors.border, marginLeft: 21, marginVertical: -2 },
+  docStep: {
+    flexDirection: 'row', alignItems: 'center', gap: Spacing.md,
+    backgroundColor: Colors.surface, borderRadius: BorderRadius.lg,
+    padding: Spacing.md, borderWidth: 1.5, borderColor: Colors.border,
     ...Shadows.sm,
   },
-  cardDone: { borderColor: Colors.success },
-  cardDisabled: { opacity: 0.4 },
-  cardImage: { width: 80, height: 56, borderRadius: BorderRadius.sm },
-  cardPlaceholder: {
-    width: 80, height: 56, borderRadius: BorderRadius.sm,
-    backgroundColor: Colors.borderLight, alignItems: 'center', justifyContent: 'center',
+  docStepDone: { borderColor: Colors.success, backgroundColor: Colors.successLight + '30' },
+  docStepDisabled: { opacity: 0.45 },
+  stepNum: {
+    width: 28, height: 28, borderRadius: 14,
+    backgroundColor: Colors.primaryLight, alignItems: 'center', justifyContent: 'center',
   },
-  cardIcon: { fontSize: 28 },
-  cardInfo: { flex: 1, marginLeft: Spacing.md },
-  cardLabel: { fontSize: FontSizes.md, fontWeight: '700', color: Colors.text },
-  cardStatus: { fontSize: FontSizes.sm, color: Colors.textMuted, marginTop: 2 },
-  cardStatusDone: { color: Colors.success },
-  nextBtn: {
-    backgroundColor: Colors.primary, borderRadius: BorderRadius.md,
-    paddingVertical: 16, alignItems: 'center', marginTop: Spacing.sm, ...Shadows.md,
-  },
-  nextBtnDisabled: { opacity: 0.5 },
-  nextBtnText: { color: '#fff', fontSize: FontSizes.lg, fontWeight: '700' },
-  tip: { fontSize: FontSizes.sm, color: Colors.textMuted, textAlign: 'center', marginTop: Spacing.md },
+  stepNumDone: { backgroundColor: Colors.success },
+  stepNumText: { fontSize: FontSizes.sm, fontWeight: FontWeights.bold, color: Colors.primary },
+  stepLabel: { fontSize: FontSizes.md, fontWeight: FontWeights.bold, color: Colors.text },
+  stepLabelDone: { color: Colors.successDark },
+  stepDesc: { fontSize: FontSizes.sm, color: Colors.textSecondary, marginTop: 2 },
+  stepCaptured: { fontSize: FontSizes.xs, color: Colors.success, fontWeight: FontWeights.semibold, marginTop: 2 },
+  thumb: { width: 64, height: 44, borderRadius: BorderRadius.sm },
+  thumbPlaceholder: { width: 64, height: 44, borderRadius: BorderRadius.sm, backgroundColor: Colors.backgroundAlt, alignItems: 'center', justifyContent: 'center' },
+  footer: { marginTop: 'auto' as any, paddingBottom: Spacing.lg, gap: Spacing.md },
+  tipRow: { flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: Colors.warningLight, padding: Spacing.md, borderRadius: BorderRadius.md },
+  tipText: { flex: 1, fontSize: FontSizes.sm, color: Colors.warningDark, lineHeight: 18 },
   // Camera
-  cameraOverlay: {
-    flex: 1, alignItems: 'center', justifyContent: 'center',
-    paddingBottom: 80, gap: Spacing.md,
-  },
-  docFrame: {
-    width: 280, height: 180, borderWidth: 2.5,
-    borderColor: '#fff', borderRadius: 12,
-    borderStyle: 'dashed',
-  },
-  cameraHint: {
-    color: '#fff', fontSize: FontSizes.md, fontWeight: '600',
-    textShadowColor: 'rgba(0,0,0,0.8)', textShadowRadius: 4,
-    textShadowOffset: { width: 0, height: 1 },
-  },
-  captureBtn: {
-    width: 72, height: 72, borderRadius: 36,
-    borderWidth: 4, borderColor: '#fff',
-    alignItems: 'center', justifyContent: 'center',
-    marginTop: Spacing.xl,
-  },
-  captureInner: {
-    width: 56, height: 56, borderRadius: 28, backgroundColor: '#fff',
-  },
-  cancelBtn: { marginTop: Spacing.md },
-  cancelText: {
-    color: '#fff', fontSize: FontSizes.md, fontWeight: '600',
-    textShadowColor: 'rgba(0,0,0,0.8)', textShadowRadius: 4,
-    textShadowOffset: { width: 0, height: 1 },
-  },
+  cameraOverlay: { flex: 1, alignItems: 'center', justifyContent: 'space-between', paddingVertical: 48, backgroundColor: 'rgba(0,0,0,0.4)' },
+  camHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', width: '100%', paddingHorizontal: 24 },
+  camTitle: { color: '#fff', fontSize: FontSizes.xl, fontWeight: FontWeights.bold },
+  docFrame: { width: 280, height: 176, position: 'relative' },
+  corner: { position: 'absolute', width: 24, height: 24, borderColor: '#fff' },
+  cTL: { top: 0, left: 0, borderTopWidth: 3, borderLeftWidth: 3, borderTopLeftRadius: 4 },
+  cTR: { top: 0, right: 0, borderTopWidth: 3, borderRightWidth: 3, borderTopRightRadius: 4 },
+  cBL: { bottom: 0, left: 0, borderBottomWidth: 3, borderLeftWidth: 3, borderBottomLeftRadius: 4 },
+  cBR: { bottom: 0, right: 0, borderBottomWidth: 3, borderRightWidth: 3, borderBottomRightRadius: 4 },
+  camHint: { color: '#fff', fontSize: FontSizes.md, fontWeight: FontWeights.medium, opacity: 0.85 },
+  captureBtn: { width: 72, height: 72, borderRadius: 36, borderWidth: 4, borderColor: '#fff', alignItems: 'center', justifyContent: 'center' },
+  captureInner: { width: 56, height: 56, borderRadius: 28, backgroundColor: '#fff' },
 });

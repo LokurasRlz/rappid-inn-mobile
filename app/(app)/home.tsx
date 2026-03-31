@@ -1,280 +1,471 @@
 import { useEffect, useState } from 'react';
 import {
-  View, Text, ScrollView, TouchableOpacity,
-  StyleSheet, SafeAreaView, FlatList, Image,
+  Image,
   RefreshControl,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
 } from 'react-native';
 import { router } from 'expo-router';
+import { Ionicons } from '@expo/vector-icons';
+
+import Badge from '../../components/ui/Badge';
+import Button from '../../components/ui/Button';
+import Card from '../../components/ui/Card';
+import EmptyState from '../../components/ui/EmptyState';
+import ScreenWrapper from '../../components/ui/ScreenWrapper';
+import { SkeletonProductCard } from '../../components/ui/Skeleton';
+import { BorderRadius, Colors, FontSizes, FontWeights, Shadows, Spacing } from '../../constants/theme';
 import { useAuthStore } from '../../services/authStore';
 import { useCartStore } from '../../services/cartStore';
 import { getProducts } from '../../services/api';
-import { Colors, Spacing, FontSizes, BorderRadius, Shadows } from '../../constants/theme';
 
 interface Product {
   id: number;
   name: string;
-  price: string;
-  category: string;
+  price: string | number;
+  category?: string;
   image_url?: string;
   barcode?: string;
+  stock?: number;
 }
 
-const CATEGORIES = ['Todos', 'Bebidas', 'Snacks', 'Lácteos', 'Carnes', 'Frutas'];
+const CATEGORIES = ['Todos', 'Bebidas', 'Snacks', 'Lacteos', 'Carnes', 'Frutas'];
 
 export default function HomeScreen() {
   const { user } = useAuthStore();
-  const { fetchSummary, addItem } = useCartStore();
+  const { addItem, count } = useCartStore();
   const [products, setProducts] = useState<Product[]>([]);
   const [selectedCategory, setSelectedCategory] = useState('Todos');
   const [refreshing, setRefreshing] = useState(false);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     loadProducts();
-    fetchSummary();
   }, []);
 
   const loadProducts = async (category?: string) => {
     try {
-      const cat = category && category !== 'Todos' ? category.toLowerCase() : undefined;
-      const res = await getProducts(1, cat);
+      const normalized = category && category !== 'Todos' ? category.toLowerCase() : undefined;
+      const res = await getProducts(1, normalized);
       setProducts(res.data.data || []);
-    } catch {}
+    } catch {
+      setProducts([]);
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
   };
 
   const onRefresh = async () => {
     setRefreshing(true);
     await loadProducts(selectedCategory);
-    await fetchSummary();
-    setRefreshing(false);
   };
 
-  const handleCategory = (cat: string) => {
-    setSelectedCategory(cat);
-    loadProducts(cat);
+  const handleCategory = (category: string) => {
+    setSelectedCategory(category);
+    setLoading(true);
+    loadProducts(category);
   };
 
-  const isVerified = user?.verification_status === 'verified';
-  const isPending = user?.verification_status === 'pending';
-  const isUnverified = user?.verification_status === 'unverified';
+  const handleAddToCart = async (product: Product) => {
+    await addItem(product.id);
+  };
+
+  const firstName = user?.name?.split(' ')[0] || 'Cliente';
 
   return (
-    <SafeAreaView style={styles.container}>
+    <ScreenWrapper>
       <ScrollView
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
+        contentContainerStyle={styles.content}
         showsVerticalScrollIndicator={false}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={Colors.primary} />}
       >
-        {/* Header */}
-        <View style={styles.header}>
-          <View>
-            <Text style={styles.greeting}>Hola, {user?.name?.split(' ')[0]} 👋</Text>
-            <Text style={styles.subGreeting}>¿Qué vas a llevar hoy?</Text>
-          </View>
-          <TouchableOpacity
-            style={styles.qrButton}
-            onPress={() => router.push('/(app)/qr-access')}
-          >
-            <Text style={styles.qrButtonIcon}>📲</Text>
-            <Text style={styles.qrButtonText}>Entrar</Text>
-          </TouchableOpacity>
-        </View>
-
-        {/* Verification banner */}
-        {isUnverified && (
-          <TouchableOpacity
-            style={styles.verifyBanner}
-            onPress={() => router.push('/(auth)/verify-doc')}
-          >
-            <Text style={styles.verifyBannerIcon}>🔐</Text>
-            <View style={{ flex: 1 }}>
-              <Text style={styles.verifyBannerTitle}>Verificá tu identidad</Text>
-              <Text style={styles.verifyBannerSubtitle}>
-                Completá la verificación para acceder a la tienda
+        <View style={styles.hero}>
+          <View style={styles.heroTop}>
+            <View>
+              <Text style={styles.eyebrow}>Rapid Inn</Text>
+              <Text style={styles.heroTitle}>Hola, {firstName}</Text>
+              <Text style={styles.heroSubtitle}>
+                Compra rapido, paga sin friccion y controla tu acceso desde una sola app.
               </Text>
             </View>
-            <Text style={styles.verifyBannerArrow}>→</Text>
-          </TouchableOpacity>
-        )}
-
-        {isPending && (
-          <View style={[styles.verifyBanner, styles.pendingBanner]}>
-            <Text style={styles.verifyBannerIcon}>⏳</Text>
-            <View style={{ flex: 1 }}>
-              <Text style={styles.verifyBannerTitle}>Verificación en proceso</Text>
-              <Text style={styles.verifyBannerSubtitle}>Revisaremos tus documentos en 24-48hs</Text>
-            </View>
+            <TouchableOpacity style={styles.profileBubble} onPress={() => router.push('/(app)/profile')}>
+              <Text style={styles.profileInitial}>{firstName.charAt(0).toUpperCase()}</Text>
+            </TouchableOpacity>
           </View>
-        )}
 
-        {/* Quick actions */}
-        <View style={styles.quickActions}>
+          <Card variant="elevated" style={styles.heroCard}>
+            <View style={styles.heroCardRow}>
+              <View>
+                <Text style={styles.heroCardLabel}>Estado de cuenta</Text>
+                <Text style={styles.heroCardValue}>{user?.verification_status === 'verified' ? 'Lista para ingresar' : 'Verificacion pendiente'}</Text>
+              </View>
+              <Badge
+                variant={user?.verification_status === 'verified' ? 'verified' : 'pending'}
+                label={user?.verification_status === 'verified' ? 'Verificada' : 'En proceso'}
+              />
+            </View>
+
+            <View style={styles.metricGrid}>
+              <MetricCard icon="bag-handle-outline" label="Carrito" value={`${count} item${count === 1 ? '' : 's'}`} />
+              <MetricCard icon="qr-code-outline" label="Acceso" value="QR activo" />
+            </View>
+          </Card>
+        </View>
+
+        <View style={styles.actionsRow}>
           <QuickAction
-            icon="📷"
+            icon="scan-outline"
             label="Escanear"
-            color={Colors.primary}
+            tone="primary"
             onPress={() => router.push('/(app)/scanner')}
           />
           <QuickAction
-            icon="📲"
-            label="QR Acceso"
-            color={Colors.secondary}
+            icon="qr-code-outline"
+            label="Acceso QR"
+            tone="success"
             onPress={() => router.push('/(app)/qr-access')}
           />
           <QuickAction
-            icon="🛒"
-            label="Mi carrito"
-            color={Colors.accent}
+            icon="wallet-outline"
+            label="Pagar"
+            tone="warning"
             onPress={() => router.push('/(app)/cart')}
-          />
-          <QuickAction
-            icon="📦"
-            label="Perfil"
-            color="#8B5CF6"
-            onPress={() => router.push('/(app)/profile')}
           />
         </View>
 
-        {/* Categories */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Categorías</Text>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.categories}>
-            {CATEGORIES.map(cat => (
-              <TouchableOpacity
-                key={cat}
-                style={[styles.categoryChip, selectedCategory === cat && styles.categoryChipActive]}
-                onPress={() => handleCategory(cat)}
-              >
-                <Text style={[styles.categoryText, selectedCategory === cat && styles.categoryTextActive]}>
-                  {cat}
-                </Text>
-              </TouchableOpacity>
-            ))}
+          <View style={styles.sectionHeader}>
+            <Text style={styles.sectionTitle}>Explorar categorias</Text>
+            <Text style={styles.sectionHint}>Seed y escaneo en un solo flujo</Text>
+          </View>
+
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chipsRow}>
+            {CATEGORIES.map((category) => {
+              const active = selectedCategory === category;
+              return (
+                <TouchableOpacity
+                  key={category}
+                  style={[styles.chip, active && styles.chipActive]}
+                  onPress={() => handleCategory(category)}
+                >
+                  <Text style={[styles.chipText, active && styles.chipTextActive]}>{category}</Text>
+                </TouchableOpacity>
+              );
+            })}
           </ScrollView>
         </View>
 
-        {/* Products grid */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Productos</Text>
-          {products.length === 0 ? (
-            <View style={styles.empty}>
-              <Text style={styles.emptyIcon}>📦</Text>
-              <Text style={styles.emptyText}>No hay productos disponibles</Text>
+          <View style={styles.sectionHeader}>
+            <Text style={styles.sectionTitle}>Productos destacados</Text>
+            <Button label="Ver carrito" variant="ghost" size="sm" fullWidth={false} onPress={() => router.push('/(app)/cart')} />
+          </View>
+
+          {loading ? (
+            <View style={styles.grid}>
+              {Array.from({ length: 4 }).map((_, index) => (
+                <SkeletonProductCard key={index} />
+              ))}
             </View>
+          ) : products.length === 0 ? (
+            <Card>
+              <EmptyState
+                icon="📦"
+                title="No hay productos para mostrar"
+                subtitle="Prueba otra categoria o actualiza la pantalla."
+              />
+            </Card>
           ) : (
             <View style={styles.grid}>
-              {products.map(product => (
-                <ProductCard
-                  key={product.id}
-                  product={product}
-                  onAddToCart={() => addItem(product.id)}
-                />
+              {products.map((product) => (
+                <ProductTile key={product.id} product={product} onAdd={() => handleAddToCart(product)} />
               ))}
             </View>
           )}
         </View>
       </ScrollView>
-    </SafeAreaView>
+    </ScreenWrapper>
   );
 }
 
 function QuickAction({
-  icon, label, color, onPress,
-}: { icon: string; label: string; color: string; onPress: () => void }) {
+  icon,
+  label,
+  tone,
+  onPress,
+}: {
+  icon: keyof typeof Ionicons.glyphMap;
+  label: string;
+  tone: 'primary' | 'success' | 'warning';
+  onPress: () => void;
+}) {
+  const toneMap = {
+    primary: { bg: Colors.primaryLight, color: Colors.primary },
+    success: { bg: Colors.successLight, color: Colors.success },
+    warning: { bg: Colors.warningLight, color: Colors.warningDark },
+  }[tone];
+
   return (
-    <TouchableOpacity style={styles.quickAction} onPress={onPress}>
-      <View style={[styles.quickActionIcon, { backgroundColor: color + '20' }]}>
-        <Text style={{ fontSize: 24 }}>{icon}</Text>
+    <Card pressable onPress={onPress} style={styles.quickCard}>
+      <View style={[styles.quickIconWrap, { backgroundColor: toneMap.bg }]}>
+        <Ionicons name={icon} size={20} color={toneMap.color} />
       </View>
-      <Text style={styles.quickActionLabel}>{label}</Text>
-    </TouchableOpacity>
+      <Text style={styles.quickLabel}>{label}</Text>
+    </Card>
   );
 }
 
-function ProductCard({
-  product, onAddToCart,
-}: { product: Product; onAddToCart: () => void }) {
+function MetricCard({
+  icon,
+  label,
+  value,
+}: {
+  icon: keyof typeof Ionicons.glyphMap;
+  label: string;
+  value: string;
+}) {
   return (
-    <View style={styles.productCard}>
-      <View style={styles.productImage}>
-        {product.image_url
-          ? <Image source={{ uri: product.image_url }} style={{ width: '100%', height: '100%' }} />
-          : <Text style={{ fontSize: 32 }}>🛍️</Text>
-        }
-      </View>
-      <Text style={styles.productName} numberOfLines={2}>{product.name}</Text>
-      <Text style={styles.productPrice}>${Number(product.price).toFixed(2)}</Text>
-      <TouchableOpacity style={styles.addBtn} onPress={onAddToCart}>
-        <Text style={styles.addBtnText}>+ Agregar</Text>
-      </TouchableOpacity>
+    <View style={styles.metricCard}>
+      <Ionicons name={icon} size={18} color={Colors.primary} />
+      <Text style={styles.metricLabel}>{label}</Text>
+      <Text style={styles.metricValue}>{value}</Text>
     </View>
   );
 }
 
+function ProductTile({
+  product,
+  onAdd,
+}: {
+  product: Product;
+  onAdd: () => void;
+}) {
+  return (
+    <Card style={styles.productCard}>
+      <View style={styles.productMedia}>
+        {product.image_url ? (
+          <Image source={{ uri: product.image_url }} style={styles.productImage} resizeMode="cover" />
+        ) : (
+          <Ionicons name="bag-handle-outline" size={28} color={Colors.primary} />
+        )}
+      </View>
+
+      <View style={styles.productBody}>
+        <Text style={styles.productCategory}>{product.category || 'General'}</Text>
+        <Text style={styles.productName} numberOfLines={2}>{product.name}</Text>
+        <Text style={styles.productPrice}>${Number(product.price).toFixed(2)}</Text>
+      </View>
+
+      <Button label="Agregar" size="sm" onPress={onAdd} />
+    </Card>
+  );
+}
+
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: Colors.background },
-  header: {
-    flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
-    paddingHorizontal: Spacing.lg, paddingTop: Spacing.lg, paddingBottom: Spacing.md,
+  content: {
+    paddingHorizontal: Spacing.md,
+    paddingTop: Spacing.sm,
+    paddingBottom: 110,
+    gap: Spacing.lg,
   },
-  greeting: { fontSize: FontSizes.xl, fontWeight: '800', color: Colors.text },
-  subGreeting: { fontSize: FontSizes.sm, color: Colors.textSecondary, marginTop: 2 },
-  qrButton: {
-    backgroundColor: Colors.primary, borderRadius: BorderRadius.md,
-    paddingHorizontal: Spacing.md, paddingVertical: Spacing.sm,
-    alignItems: 'center', ...Shadows.md,
+  hero: {
+    backgroundColor: Colors.primary,
+    borderRadius: BorderRadius.xxl,
+    padding: Spacing.lg,
+    gap: Spacing.lg,
+    ...Shadows.primaryGlow,
   },
-  qrButtonIcon: { fontSize: 20 },
-  qrButtonText: { color: '#fff', fontSize: FontSizes.xs, fontWeight: '700', marginTop: 2 },
-  verifyBanner: {
-    flexDirection: 'row', alignItems: 'center',
-    backgroundColor: Colors.primaryLight, margin: Spacing.lg,
-    borderRadius: BorderRadius.lg, padding: Spacing.md, gap: Spacing.sm,
-    borderWidth: 1, borderColor: Colors.primary + '40',
+  heroTop: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    gap: Spacing.md,
   },
-  pendingBanner: { backgroundColor: Colors.warningLight, borderColor: Colors.warning + '40' },
-  verifyBannerIcon: { fontSize: 22 },
-  verifyBannerTitle: { fontSize: FontSizes.sm, fontWeight: '700', color: Colors.text },
-  verifyBannerSubtitle: { fontSize: FontSizes.xs, color: Colors.textSecondary, marginTop: 1 },
-  verifyBannerArrow: { color: Colors.primary, fontSize: FontSizes.lg, fontWeight: '700' },
-  quickActions: {
-    flexDirection: 'row', justifyContent: 'space-around',
-    paddingHorizontal: Spacing.md, marginBottom: Spacing.md,
+  eyebrow: {
+    color: 'rgba(255,255,255,0.72)',
+    fontSize: FontSizes.xs,
+    fontWeight: FontWeights.bold,
+    textTransform: 'uppercase',
+    letterSpacing: 1.2,
   },
-  quickAction: { alignItems: 'center', gap: 6 },
-  quickActionIcon: {
-    width: 56, height: 56, borderRadius: BorderRadius.lg,
-    alignItems: 'center', justifyContent: 'center',
+  heroTitle: {
+    color: '#fff',
+    fontSize: FontSizes.display,
+    fontWeight: FontWeights.extrabold,
+    marginTop: 6,
   },
-  quickActionLabel: { fontSize: FontSizes.xs, color: Colors.textSecondary, fontWeight: '600' },
-  section: { paddingHorizontal: Spacing.lg, marginBottom: Spacing.lg },
-  sectionTitle: { fontSize: FontSizes.lg, fontWeight: '800', color: Colors.text, marginBottom: Spacing.md },
-  categories: { flexDirection: 'row' },
-  categoryChip: {
-    paddingHorizontal: Spacing.md, paddingVertical: 8,
-    borderRadius: BorderRadius.full, backgroundColor: Colors.surface,
-    borderWidth: 1.5, borderColor: Colors.border, marginRight: Spacing.sm,
+  heroSubtitle: {
+    color: 'rgba(255,255,255,0.82)',
+    fontSize: FontSizes.md,
+    lineHeight: 22,
+    marginTop: 6,
+    maxWidth: 260,
   },
-  categoryChipActive: { backgroundColor: Colors.primary, borderColor: Colors.primary },
-  categoryText: { fontSize: FontSizes.sm, fontWeight: '600', color: Colors.textSecondary },
-  categoryTextActive: { color: '#fff' },
-  grid: { flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.md },
+  profileBubble: {
+    width: 48,
+    height: 48,
+    borderRadius: BorderRadius.full,
+    backgroundColor: 'rgba(255,255,255,0.18)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  profileInitial: {
+    color: '#fff',
+    fontSize: FontSizes.lg,
+    fontWeight: FontWeights.bold,
+  },
+  heroCard: {
+    backgroundColor: 'rgba(255,255,255,0.98)',
+  },
+  heroCardRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: Spacing.md,
+  },
+  heroCardLabel: {
+    color: Colors.textMuted,
+    fontSize: FontSizes.xs,
+    textTransform: 'uppercase',
+    letterSpacing: 1,
+    fontWeight: FontWeights.bold,
+  },
+  heroCardValue: {
+    color: Colors.text,
+    fontSize: FontSizes.xl,
+    fontWeight: FontWeights.extrabold,
+    marginTop: 4,
+  },
+  metricGrid: {
+    flexDirection: 'row',
+    gap: Spacing.sm,
+  },
+  metricCard: {
+    flex: 1,
+    backgroundColor: Colors.background,
+    borderRadius: BorderRadius.lg,
+    padding: Spacing.md,
+    gap: 6,
+  },
+  metricLabel: {
+    color: Colors.textSecondary,
+    fontSize: FontSizes.xs,
+    fontWeight: FontWeights.semibold,
+  },
+  metricValue: {
+    color: Colors.text,
+    fontSize: FontSizes.md,
+    fontWeight: FontWeights.bold,
+  },
+  actionsRow: {
+    flexDirection: 'row',
+    gap: Spacing.sm,
+  },
+  quickCard: {
+    flex: 1,
+    alignItems: 'center',
+    gap: Spacing.sm,
+    paddingVertical: Spacing.md,
+  },
+  quickIconWrap: {
+    width: 48,
+    height: 48,
+    borderRadius: BorderRadius.lg,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  quickLabel: {
+    color: Colors.text,
+    fontSize: FontSizes.sm,
+    fontWeight: FontWeights.semibold,
+  },
+  section: {
+    gap: Spacing.md,
+  },
+  sectionHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    gap: Spacing.md,
+  },
+  sectionTitle: {
+    color: Colors.text,
+    fontSize: FontSizes.xl,
+    fontWeight: FontWeights.extrabold,
+  },
+  sectionHint: {
+    color: Colors.textSecondary,
+    fontSize: FontSizes.sm,
+  },
+  chipsRow: {
+    gap: Spacing.sm,
+  },
+  chip: {
+    paddingHorizontal: Spacing.md,
+    paddingVertical: 10,
+    borderRadius: BorderRadius.full,
+    backgroundColor: Colors.surface,
+    borderWidth: 1,
+    borderColor: Colors.border,
+  },
+  chipActive: {
+    backgroundColor: Colors.primary,
+    borderColor: Colors.primary,
+  },
+  chipText: {
+    color: Colors.textSecondary,
+    fontSize: FontSizes.sm,
+    fontWeight: FontWeights.semibold,
+  },
+  chipTextActive: {
+    color: '#fff',
+  },
+  grid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'space-between',
+    gap: Spacing.md,
+  },
   productCard: {
-    width: '47%', backgroundColor: Colors.surface,
-    borderRadius: BorderRadius.lg, padding: Spacing.md,
-    ...Shadows.sm, borderWidth: 1, borderColor: Colors.borderLight,
+    width: '47.5%',
+    padding: Spacing.sm,
+    gap: Spacing.sm,
+  },
+  productMedia: {
+    height: 110,
+    borderRadius: BorderRadius.lg,
+    backgroundColor: Colors.backgroundAlt,
+    alignItems: 'center',
+    justifyContent: 'center',
+    overflow: 'hidden',
   },
   productImage: {
-    width: '100%', height: 90, borderRadius: BorderRadius.md,
-    backgroundColor: Colors.borderLight, alignItems: 'center', justifyContent: 'center',
-    marginBottom: Spacing.sm, overflow: 'hidden',
+    width: '100%',
+    height: '100%',
   },
-  productName: { fontSize: FontSizes.sm, fontWeight: '600', color: Colors.text, minHeight: 36 },
-  productPrice: { fontSize: FontSizes.lg, fontWeight: '800', color: Colors.primary, marginVertical: 4 },
-  addBtn: {
-    backgroundColor: Colors.primary, borderRadius: BorderRadius.sm,
-    paddingVertical: 8, alignItems: 'center', marginTop: 4,
+  productBody: {
+    gap: 4,
+    minHeight: 92,
   },
-  addBtnText: { color: '#fff', fontSize: FontSizes.xs, fontWeight: '700' },
-  empty: { alignItems: 'center', paddingVertical: Spacing.xxl, gap: Spacing.md },
-  emptyIcon: { fontSize: 48 },
-  emptyText: { fontSize: FontSizes.md, color: Colors.textSecondary },
+  productCategory: {
+    color: Colors.textMuted,
+    fontSize: FontSizes.xs,
+    textTransform: 'uppercase',
+    letterSpacing: 0.8,
+    fontWeight: FontWeights.bold,
+  },
+  productName: {
+    color: Colors.text,
+    fontSize: FontSizes.md,
+    fontWeight: FontWeights.bold,
+    lineHeight: 20,
+  },
+  productPrice: {
+    color: Colors.primary,
+    fontSize: FontSizes.xl,
+    fontWeight: FontWeights.extrabold,
+  },
 });

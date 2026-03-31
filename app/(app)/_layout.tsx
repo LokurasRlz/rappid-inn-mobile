@@ -1,8 +1,10 @@
 import { useEffect } from 'react';
-import { Tabs, router } from 'expo-router';
-import { Text, View, StyleSheet } from 'react-native';
+import { Redirect, Tabs } from 'expo-router';
+import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 
-import { Colors, FontSizes } from '../../constants/theme';
+import ScreenWrapper from '../../components/ui/ScreenWrapper';
+import { BorderRadius, Colors, FontSizes, Shadows, Spacing } from '../../constants/theme';
 import { useAuthStore } from '../../services/authStore';
 import { useCartStore } from '../../services/cartStore';
 import { getVerificationRoute, requiresIdentityVerification } from '../../services/verificationFlow';
@@ -12,64 +14,66 @@ export default function AppLayout() {
   const { count, fetchCart } = useCartStore();
 
   useEffect(() => {
-    if (!isLoading && !isAuthenticated) {
-      router.replace('/(auth)/welcome');
-      return;
-    }
-
-    if (
-      !isLoading &&
-      isAuthenticated &&
-      requiresIdentityVerification(user) &&
-      user?.verification_status !== 'verified'
-    ) {
-      router.replace(getVerificationRoute(user) as any);
-    }
-  }, [isAuthenticated, isLoading, user]);
-
-  useEffect(() => {
     if (isAuthenticated) {
       fetchCart();
     }
   }, [fetchCart, isAuthenticated]);
 
+  if (isLoading) {
+    return (
+      <ScreenWrapper style={styles.loadingContainer}>
+        <View style={styles.loadingCard}>
+          <ActivityIndicator size="large" color={Colors.primary} />
+          <Text style={styles.loadingTitle}>Preparando tu cuenta</Text>
+        </View>
+      </ScreenWrapper>
+    );
+  }
+
+  if (!isAuthenticated) {
+    return <Redirect href="/(auth)/welcome" />;
+  }
+
+  if (requiresIdentityVerification(user) && user?.verification_status !== 'verified') {
+    return <Redirect href={getVerificationRoute(user) as any} />;
+  }
+
   return (
     <Tabs
       screenOptions={{
         headerShown: false,
-        tabBarStyle: {
-          backgroundColor: Colors.surface,
-          borderTopColor: Colors.border,
-          borderTopWidth: 1,
-          height: 60,
-          paddingBottom: 8,
-        },
+        tabBarStyle: styles.tabBar,
         tabBarActiveTintColor: Colors.primary,
         tabBarInactiveTintColor: Colors.textMuted,
-        tabBarLabelStyle: { fontSize: FontSizes.xs, fontWeight: '600' },
+        tabBarLabelStyle: styles.tabLabel,
+        tabBarItemStyle: styles.tabItem,
       }}
     >
       <Tabs.Screen
         name="home"
         options={{
           title: 'Inicio',
-          tabBarIcon: ({ color }) => <TabIcon icon="H" color={color} />,
+          tabBarIcon: ({ color, focused }) => (
+            <TabIcon icon="home-outline" activeIcon="home" color={color} focused={focused} />
+          ),
         }}
       />
       <Tabs.Screen
         name="scanner"
         options={{
           title: 'Escanear',
-          tabBarIcon: ({ color }) => <TabIcon icon="S" color={color} />,
+          tabBarIcon: ({ color, focused }) => (
+            <TabIcon icon="scan-outline" activeIcon="scan" color={color} focused={focused} />
+          ),
         }}
       />
       <Tabs.Screen
         name="cart"
         options={{
           title: 'Carrito',
-          tabBarIcon: ({ color }) => (
+          tabBarIcon: ({ color, focused }) => (
             <View>
-              <TabIcon icon="C" color={color} />
+              <TabIcon icon="bag-handle-outline" activeIcon="bag-handle" color={color} focused={focused} />
               {count > 0 && (
                 <View style={styles.badge}>
                   <Text style={styles.badgeText}>{count > 9 ? '9+' : count}</Text>
@@ -83,7 +87,9 @@ export default function AppLayout() {
         name="profile"
         options={{
           title: 'Perfil',
-          tabBarIcon: ({ color }) => <TabIcon icon="P" color={color} />,
+          tabBarIcon: ({ color, focused }) => (
+            <TabIcon icon="person-outline" activeIcon="person" color={color} focused={focused} />
+          ),
         }}
       />
       <Tabs.Screen name="checkout" options={{ href: null }} />
@@ -92,22 +98,90 @@ export default function AppLayout() {
   );
 }
 
-function TabIcon({ icon, color }: { icon: string; color: string }) {
-  return <Text style={{ fontSize: 18, fontWeight: '800', color }}>{icon}</Text>;
+function TabIcon({
+  icon,
+  activeIcon,
+  color,
+  focused,
+}: {
+  icon: keyof typeof Ionicons.glyphMap;
+  activeIcon: keyof typeof Ionicons.glyphMap;
+  color: string;
+  focused: boolean;
+}) {
+  return (
+    <View style={[styles.iconWrap, focused && styles.iconWrapFocused]}>
+      <Ionicons name={focused ? activeIcon : icon} size={20} color={color} />
+    </View>
+  );
 }
 
 const styles = StyleSheet.create({
+  tabBar: {
+    position: 'absolute',
+    left: Spacing.md,
+    right: Spacing.md,
+    bottom: Spacing.md,
+    height: 72,
+    paddingTop: 10,
+    paddingBottom: 10,
+    paddingHorizontal: 8,
+    backgroundColor: 'rgba(255,255,255,0.96)',
+    borderTopWidth: 0,
+    borderRadius: BorderRadius.xxl,
+    ...Shadows.lg,
+  },
+  tabItem: {
+    borderRadius: BorderRadius.lg,
+  },
+  tabLabel: {
+    fontSize: FontSizes.xs,
+    fontWeight: '700',
+    marginBottom: 4,
+  },
+  iconWrap: {
+    width: 36,
+    height: 36,
+    borderRadius: BorderRadius.full,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  iconWrapFocused: {
+    backgroundColor: Colors.primaryLight,
+  },
   badge: {
     position: 'absolute',
     top: -4,
     right: -8,
-    backgroundColor: Colors.danger,
-    borderRadius: 10,
+    backgroundColor: Colors.error,
+    borderRadius: BorderRadius.full,
     minWidth: 18,
     height: 18,
     alignItems: 'center',
     justifyContent: 'center',
-    paddingHorizontal: 3,
+    paddingHorizontal: 4,
   },
-  badgeText: { color: '#fff', fontSize: 10, fontWeight: '800' },
+  badgeText: {
+    color: '#fff',
+    fontSize: 10,
+    fontWeight: '800',
+  },
+  loadingContainer: {
+    justifyContent: 'center',
+    padding: Spacing.lg,
+  },
+  loadingCard: {
+    backgroundColor: Colors.surface,
+    borderRadius: BorderRadius.xxl,
+    padding: Spacing.xl,
+    alignItems: 'center',
+    gap: Spacing.sm,
+    ...Shadows.md,
+  },
+  loadingTitle: {
+    color: Colors.text,
+    fontSize: FontSizes.xl,
+    fontWeight: '700',
+    textAlign: 'center',
+  },
 });
