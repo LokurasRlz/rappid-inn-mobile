@@ -1,0 +1,75 @@
+{
+  "expo": {
+    "name": "SuperMercado App",
+    "slug": "supermarket-app",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/images/icon.png",
+    "scheme": "supermarket",
+    "userInterfaceStyle": "light",
+    "splash": {
+      "image": "./assets/images/splash.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#1B5E20"
+    },
+    "ios": {
+      "supportsTablet": false,
+      "bundleIdentifier": "com.tuempresa.supermarketapp",
+      "infoPlist": {
+        "NSCameraUsageDescription": "Necesitamos acceso a la cámara para escanear códigos de barras y QR.",
+        "NSPhotoLibraryUsageDescription": "Necesitamos acceso a tus fotos para actualizar tu perfil."
+      }
+    },
+    "android": {
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/images/adaptive-icon.png",
+        "backgroundColor": "#1B5E20"
+      },
+      "package": "com.tuempresa.supermarketapp",
+      "permissions": [
+        "android.permission.CAMERA",
+        "android.permission.INTERNET"
+      ]
+    },
+    "web": {
+      "bundler": "metro",
+      "output": "static",
+      "favicon": "./assets/images/favicon.png",
+      "name": "SuperMercado App",
+      "shortName": "SuperApp",
+      "description": "Tu supermercado autónomo",
+      "themeColor": "#1B5E20",
+      "backgroundColor": "#FFFFFF"
+    },
+    "plugins": [
+      "expo-router",
+      "expo-secure-store",
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "Permitir acceso a la cámara para escanear productos."
+        }
+      ],
+      [
+        "expo-barcode-scanner",
+        {
+          "cameraPermission": "Permitir acceso a la cámara para escanear códigos de barras."
+        }
+      ]
+    ],
+    "experiments": {
+      "typedRoutes": true
+    },
+    "extra": {
+      "router": {
+        "origin": false
+      },
+      "eas": {
+        "projectId": "TU-EAS-PROJECT-ID"
+      },
+      "apiBaseUrl": "http://192.168.3.104:3000/api/v1",
+      "googleClientId": "TU_GOOGLE_CLIENT_ID.apps.googleusercontent.com",
+      "mpPublicKey": "TEST-TU-MP-PUBLIC-KEY"
+    }
+  }
+}
