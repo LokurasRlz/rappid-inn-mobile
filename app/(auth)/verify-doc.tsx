@@ -1,14 +1,16 @@
-import React, { useState, useRef } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, Image, Animated } from 'react-native';
+import React, { useRef, useState } from 'react';
+import { Animated, Image, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import Toast from 'react-native-toast-message';
-import ScreenWrapper from '../../components/ui/ScreenWrapper';
+
+import BrandMark from '../../components/ui/BrandMark';
 import Button from '../../components/ui/Button';
 import Card from '../../components/ui/Card';
+import ScreenWrapper from '../../components/ui/ScreenWrapper';
 import { uploadDocument } from '../../services/api';
-import { Colors, Spacing, FontSizes, FontWeights, BorderRadius, Shadows } from '../../constants/theme';
+import { BorderRadius, Colors, FontFamilies, FontSizes, FontWeights, Shadows, Spacing, Typography } from '../../constants/theme';
 
 type DocSide = 'front' | 'back';
 
@@ -29,13 +31,13 @@ export default function VerifyDocScreen() {
       if (step === 'front') {
         setFrontUri(photo.uri);
         await uploadDocument('front', photo.base64 || '');
-        Toast.show({ type: 'success', text1: '✓ Frente capturado' });
+        Toast.show({ type: 'success', text1: 'Frente capturado' });
         setShowCamera(false);
         setTimeout(() => { setStep('back'); setShowCamera(true); }, 400);
       } else {
         setBackUri(photo.uri);
         await uploadDocument('back', photo.base64 || '');
-        Toast.show({ type: 'success', text1: '✓ Dorso capturado' });
+        Toast.show({ type: 'success', text1: 'Dorso capturado' });
         setShowCamera(false);
       }
     } catch {
@@ -50,8 +52,9 @@ export default function VerifyDocScreen() {
       return (
         <ScreenWrapper>
           <View style={styles.permContainer}>
+            <BrandMark align="center" size="sm" />
             <Ionicons name="camera-outline" size={64} color={Colors.primary} />
-            <Text style={styles.permTitle}>Cámara necesaria</Text>
+            <Text style={styles.permTitle}>Camara necesaria</Text>
             <Button label="Permitir acceso" onPress={requestPermission} fullWidth={false} />
           </View>
         </ScreenWrapper>
@@ -64,7 +67,7 @@ export default function VerifyDocScreen() {
             <View style={styles.camHeader}>
               <Text style={styles.camTitle}>{step === 'front' ? 'Frente del DNI' : 'Dorso del DNI'}</Text>
               <TouchableOpacity onPress={() => setShowCamera(false)}>
-                <Ionicons name="close-circle" size={32} color="#fff" />
+                <Ionicons name="close-circle" size={32} color={Colors.textInverse} />
               </TouchableOpacity>
             </View>
             <View style={styles.docFrame}>
@@ -73,7 +76,7 @@ export default function VerifyDocScreen() {
               <View style={[styles.corner, styles.cBL]} />
               <View style={[styles.corner, styles.cBR]} />
             </View>
-            <Text style={styles.camHint}>Encuadrá el DNI dentro del marco</Text>
+            <Text style={styles.camHint}>Encuadra el DNI dentro del marco</Text>
             <TouchableOpacity style={styles.captureBtn} onPress={takePicture} disabled={loading}>
               <View style={styles.captureInner} />
             </TouchableOpacity>
@@ -92,11 +95,12 @@ export default function VerifyDocScreen() {
         </TouchableOpacity>
 
         <View style={styles.header}>
+          <BrandMark align="center" size="sm" />
           <View style={styles.iconWrap}>
             <Ionicons name="card-outline" size={36} color={Colors.primary} />
           </View>
           <Text style={styles.title}>Foto de DNI</Text>
-          <Text style={styles.subtitle}>Necesitamos una foto de tu documento por ambos lados</Text>
+          <Text style={styles.subtitle}>Necesitamos una foto de tu documento por ambos lados.</Text>
         </View>
 
         <View style={styles.steps}>
@@ -114,7 +118,14 @@ export default function VerifyDocScreen() {
             label="Dorso del DNI"
             description="La parte trasera del documento"
             uri={backUri}
-            onCapture={() => { if (!frontUri) { Toast.show({ type: 'error', text1: 'Primero capturá el frente' }); return; } setStep('back'); setShowCamera(true); }}
+            onCapture={() => {
+              if (!frontUri) {
+                Toast.show({ type: 'error', text1: 'Primero captura el frente' });
+                return;
+              }
+              setStep('back');
+              setShowCamera(true);
+            }}
             done={!!backUri}
             disabled={!frontUri}
           />
@@ -122,11 +133,11 @@ export default function VerifyDocScreen() {
 
         <View style={styles.footer}>
           <View style={styles.tipRow}>
-            <Ionicons name="bulb-outline" size={16} color={Colors.warning} />
-            <Text style={styles.tipText}>Asegurate de que el texto sea legible y sin reflejos</Text>
+            <Ionicons name="bulb-outline" size={16} color={Colors.warningDark} />
+            <Text style={styles.tipText}>Asegurate de que el texto sea legible y sin reflejos.</Text>
           </View>
           <Button
-            label={!frontUri ? 'Capturar frente →' : !backUri ? 'Capturar dorso →' : 'Continuar →'}
+            label={!frontUri ? 'Capturar frente' : !backUri ? 'Capturar dorso' : 'Continuar'}
             onPress={() => {
               if (!frontUri) { setStep('front'); setShowCamera(true); }
               else if (!backUri) { setStep('back'); setShowCamera(true); }
@@ -145,12 +156,12 @@ function DocStep({ number, label, description, uri, onCapture, done, disabled }:
   return (
     <TouchableOpacity style={[styles.docStep, done && styles.docStepDone, disabled && styles.docStepDisabled]} onPress={onCapture} disabled={disabled}>
       <View style={[styles.stepNum, done && styles.stepNumDone]}>
-        {done ? <Ionicons name="checkmark" size={16} color="#fff" /> : <Text style={[styles.stepNumText, done && { color: '#fff' }]}>{number}</Text>}
+        {done ? <Ionicons name="checkmark" size={16} color={Colors.textInverse} /> : <Text style={styles.stepNumText}>{number}</Text>}
       </View>
       <View style={{ flex: 1 }}>
         <Text style={[styles.stepLabel, done && styles.stepLabelDone]}>{label}</Text>
         <Text style={styles.stepDesc}>{description}</Text>
-        {done && <Text style={styles.stepCaptured}>Capturado ✓</Text>}
+        {done ? <Text style={styles.stepCaptured}>Capturado</Text> : null}
       </View>
       {uri ? (
         <Image source={{ uri }} style={styles.thumb} />
@@ -166,49 +177,57 @@ function DocStep({ number, label, description, uri, onCapture, done, disabled }:
 const styles = StyleSheet.create({
   inner: { flex: 1, paddingHorizontal: Spacing.lg },
   permContainer: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: Spacing.md },
-  permTitle: { fontSize: FontSizes.xl, fontWeight: FontWeights.bold, color: Colors.text },
+  permTitle: { ...Typography.h3, fontSize: FontSizes.xl },
   back: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: Spacing.md },
-  backText: { fontSize: FontSizes.md, color: Colors.textSecondary, fontWeight: FontWeights.medium },
+  backText: { fontSize: FontSizes.md, color: Colors.textSecondary, fontFamily: FontFamilies.body, fontWeight: FontWeights.medium },
   header: { alignItems: 'center', marginVertical: Spacing.xl, gap: Spacing.sm },
-  iconWrap: { width: 72, height: 72, borderRadius: 24, backgroundColor: Colors.primaryLight, alignItems: 'center', justifyContent: 'center', marginBottom: Spacing.sm },
-  title: { fontSize: FontSizes.xxl, fontWeight: FontWeights.extrabold, color: Colors.text },
-  subtitle: { fontSize: FontSizes.md, color: Colors.textSecondary, textAlign: 'center', lineHeight: 22 },
+  iconWrap: { width: 72, height: 72, borderRadius: 24, backgroundColor: Colors.primarySoftest, alignItems: 'center', justifyContent: 'center', marginBottom: Spacing.sm },
+  title: { ...Typography.h2 },
+  subtitle: { fontSize: FontSizes.md, color: Colors.textSecondary, textAlign: 'center', lineHeight: 22, fontFamily: FontFamilies.body },
   steps: { gap: 0, marginBottom: Spacing.xl },
   stepConnector: { height: 20, width: 2, backgroundColor: Colors.border, marginLeft: 21, marginVertical: -2 },
   docStep: {
-    flexDirection: 'row', alignItems: 'center', gap: Spacing.md,
-    backgroundColor: Colors.surface, borderRadius: BorderRadius.lg,
-    padding: Spacing.md, borderWidth: 1.5, borderColor: Colors.border,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.md,
+    backgroundColor: Colors.surface,
+    borderRadius: BorderRadius.lg,
+    padding: Spacing.md,
+    borderWidth: 1.2,
+    borderColor: Colors.border,
     ...Shadows.sm,
   },
-  docStepDone: { borderColor: Colors.success, backgroundColor: Colors.successLight + '30' },
+  docStepDone: { borderColor: Colors.success, backgroundColor: Colors.successLight },
   docStepDisabled: { opacity: 0.45 },
   stepNum: {
-    width: 28, height: 28, borderRadius: 14,
-    backgroundColor: Colors.primaryLight, alignItems: 'center', justifyContent: 'center',
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: Colors.primarySoftest,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   stepNumDone: { backgroundColor: Colors.success },
-  stepNumText: { fontSize: FontSizes.sm, fontWeight: FontWeights.bold, color: Colors.primary },
-  stepLabel: { fontSize: FontSizes.md, fontWeight: FontWeights.bold, color: Colors.text },
+  stepNumText: { fontSize: FontSizes.sm, fontWeight: FontWeights.bold, color: Colors.primary, fontFamily: FontFamilies.body },
+  stepLabel: { fontSize: FontSizes.md, fontWeight: FontWeights.bold, color: Colors.text, fontFamily: FontFamilies.body },
   stepLabelDone: { color: Colors.successDark },
-  stepDesc: { fontSize: FontSizes.sm, color: Colors.textSecondary, marginTop: 2 },
-  stepCaptured: { fontSize: FontSizes.xs, color: Colors.success, fontWeight: FontWeights.semibold, marginTop: 2 },
+  stepDesc: { fontSize: FontSizes.sm, color: Colors.textSecondary, marginTop: 2, fontFamily: FontFamilies.body },
+  stepCaptured: { fontSize: FontSizes.xs, color: Colors.successDark, fontWeight: FontWeights.semibold, marginTop: 2, fontFamily: FontFamilies.body },
   thumb: { width: 64, height: 44, borderRadius: BorderRadius.sm },
-  thumbPlaceholder: { width: 64, height: 44, borderRadius: BorderRadius.sm, backgroundColor: Colors.backgroundAlt, alignItems: 'center', justifyContent: 'center' },
+  thumbPlaceholder: { width: 64, height: 44, borderRadius: BorderRadius.sm, backgroundColor: Colors.surfaceMuted, alignItems: 'center', justifyContent: 'center' },
   footer: { marginTop: 'auto' as any, paddingBottom: Spacing.lg, gap: Spacing.md },
   tipRow: { flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: Colors.warningLight, padding: Spacing.md, borderRadius: BorderRadius.md },
-  tipText: { flex: 1, fontSize: FontSizes.sm, color: Colors.warningDark, lineHeight: 18 },
-  // Camera
-  cameraOverlay: { flex: 1, alignItems: 'center', justifyContent: 'space-between', paddingVertical: 48, backgroundColor: 'rgba(0,0,0,0.4)' },
+  tipText: { flex: 1, fontSize: FontSizes.sm, color: Colors.warningDark, lineHeight: 18, fontFamily: FontFamilies.body },
+  cameraOverlay: { flex: 1, alignItems: 'center', justifyContent: 'space-between', paddingVertical: 48, backgroundColor: 'rgba(33, 51, 40, 0.4)' },
   camHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', width: '100%', paddingHorizontal: 24 },
-  camTitle: { color: '#fff', fontSize: FontSizes.xl, fontWeight: FontWeights.bold },
+  camTitle: { color: Colors.textInverse, fontSize: FontSizes.xl, fontFamily: FontFamilies.editorial },
   docFrame: { width: 280, height: 176, position: 'relative' },
-  corner: { position: 'absolute', width: 24, height: 24, borderColor: '#fff' },
+  corner: { position: 'absolute', width: 24, height: 24, borderColor: Colors.accentLight },
   cTL: { top: 0, left: 0, borderTopWidth: 3, borderLeftWidth: 3, borderTopLeftRadius: 4 },
   cTR: { top: 0, right: 0, borderTopWidth: 3, borderRightWidth: 3, borderTopRightRadius: 4 },
   cBL: { bottom: 0, left: 0, borderBottomWidth: 3, borderLeftWidth: 3, borderBottomLeftRadius: 4 },
   cBR: { bottom: 0, right: 0, borderBottomWidth: 3, borderRightWidth: 3, borderBottomRightRadius: 4 },
-  camHint: { color: '#fff', fontSize: FontSizes.md, fontWeight: FontWeights.medium, opacity: 0.85 },
-  captureBtn: { width: 72, height: 72, borderRadius: 36, borderWidth: 4, borderColor: '#fff', alignItems: 'center', justifyContent: 'center' },
-  captureInner: { width: 56, height: 56, borderRadius: 28, backgroundColor: '#fff' },
+  camHint: { color: Colors.textInverse, fontSize: FontSizes.md, fontFamily: FontFamilies.body, opacity: 0.85 },
+  captureBtn: { width: 72, height: 72, borderRadius: 36, borderWidth: 4, borderColor: Colors.textInverse, alignItems: 'center', justifyContent: 'center' },
+  captureInner: { width: 56, height: 56, borderRadius: 28, backgroundColor: Colors.textInverse },
 });

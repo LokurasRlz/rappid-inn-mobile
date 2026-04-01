@@ -1,7 +1,7 @@
 import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import Button from './Button';
-import { Colors, FontSizes, FontWeights, Spacing } from '../../constants/theme';
+import { Colors, FontFamilies, FontSizes, Spacing, Typography } from '../../constants/theme';
 
 interface EmptyStateProps {
   icon: string;
@@ -36,12 +36,12 @@ const styles = StyleSheet.create({
   },
   icon: { fontSize: 64, marginBottom: Spacing.sm },
   title: {
+    ...Typography.h3,
     fontSize: FontSizes.xl,
-    fontWeight: FontWeights.bold,
-    color: Colors.text,
     textAlign: 'center',
   },
   subtitle: {
+    fontFamily: FontFamilies.body,
     fontSize: FontSizes.md,
     color: Colors.textSecondary,
     textAlign: 'center',

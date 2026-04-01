@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, Pressable, StyleSheet, Animated, ViewStyle } from 'react-native';
+import { View, Pressable, StyleSheet, Animated, StyleProp, ViewStyle } from 'react-native';
 import { Colors, BorderRadius, Shadows } from '../../constants/theme';
 
 interface CardProps {
@@ -7,7 +7,7 @@ interface CardProps {
   onPress?: () => void;
   variant?: 'default' | 'elevated' | 'outlined' | 'flat';
   padding?: number;
-  style?: ViewStyle;
+  style?: StyleProp<ViewStyle>;
   pressable?: boolean;
 }
 
@@ -50,7 +50,7 @@ export default function Card({
 
 const styles = StyleSheet.create({
   base: {
-    borderRadius: BorderRadius.lg,
+    borderRadius: BorderRadius.xl,
     backgroundColor: Colors.surface,
   },
   variant_default: {
@@ -60,12 +60,16 @@ const styles = StyleSheet.create({
   },
   variant_elevated: {
     ...Shadows.md,
+    borderWidth: 1,
+    borderColor: Colors.borderLight,
   },
   variant_outlined: {
-    borderWidth: 1.5,
+    borderWidth: 1.2,
     borderColor: Colors.border,
   },
   variant_flat: {
-    backgroundColor: Colors.backgroundAlt,
+    backgroundColor: Colors.surfaceMuted,
+    borderWidth: 1,
+    borderColor: Colors.borderLight,
   },
 });

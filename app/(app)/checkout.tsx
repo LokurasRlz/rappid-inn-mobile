@@ -6,6 +6,7 @@ import {
   StyleSheet,
   Text,
   TouchableOpacity,
+  useWindowDimensions,
   View,
 } from 'react-native';
 import * as WebBrowser from 'expo-web-browser';
@@ -13,25 +14,32 @@ import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 
 import Button from '../../components/ui/Button';
+import BrandMark from '../../components/ui/BrandMark';
 import Card from '../../components/ui/Card';
-import Input from '../../components/ui/Input';
 import ScreenWrapper from '../../components/ui/ScreenWrapper';
-import { BorderRadius, Colors, FontSizes, FontWeights, Shadows, Spacing } from '../../constants/theme';
+import { BorderRadius, Colors, FontFamilies, FontSizes, FontWeights, Shadows, Spacing, Typography } from '../../constants/theme';
 import { useCartStore } from '../../services/cartStore';
-import { PaymentMethod, confirmManualPayment, createOrder, getPaymentStatus } from '../../services/api';
+import { DirectPaymentProvider, PaymentMethod, confirmManualPayment, createOrder, getPaymentStatus } from '../../services/api';
 
 type Stage = 'summary' | 'paying' | 'success' | 'error';
 
-const PAYMENT_OPTIONS: { id: PaymentMethod; title: string; body: string; icon: keyof typeof Ionicons.glyphMap }[] = [
-  { id: 'mercadopago', title: 'Mercado Pago', body: 'Checkout externo rapido con confirmacion real del pago.', icon: 'wallet-outline' },
-  { id: 'card', title: 'Tarjeta credito / debito', body: 'Confirmacion manual en app para demo retail.', icon: 'card-outline' },
-  { id: 'expensas', title: 'Imputar a expensas', body: 'Disponible para locales integrados en barrio privado.', icon: 'home-outline' },
+const PAYMENT_METHOD_OPTIONS: { id: PaymentMethod; title: string; body: string; icon: keyof typeof Ionicons.glyphMap }[] = [
+  { id: 'DIRECT', title: 'Pago directo', body: 'Cobro inmediato para mantener el flujo rapido de compra y salida por QR.', icon: 'flash-outline' },
+  { id: 'EXPENSE', title: 'Imputar a expensas', body: 'El consumo se registra al lote y queda incluido en la liquidacion mensual.', icon: 'home-outline' },
+];
+
+const DIRECT_PROVIDER_OPTIONS: { id: DirectPaymentProvider; title: string; body: string; icon: keyof typeof Ionicons.glyphMap }[] = [
+  { id: 'MERCADOPAGO', title: 'Mercado Pago', body: 'Checkout externo con confirmacion real del pago.', icon: 'wallet-outline' },
+  { id: 'CARD', title: 'Tarjeta credito / debito', body: 'Confirmacion manual en app para demo retail.', icon: 'card-outline' },
 ];
 
 export default function CheckoutScreen() {
+  const { width } = useWindowDimensions();
+  const isWide = width >= 960;
+  const isTablet = width >= 720;
   const { items, total, count, clearAll } = useCartStore();
-  const [selectedMethod, setSelectedMethod] = useState<PaymentMethod>('mercadopago');
-  const [expensasUnit, setExpensasUnit] = useState('');
+  const [selectedMethod, setSelectedMethod] = useState<PaymentMethod>('DIRECT');
+  const [selectedProvider, setSelectedProvider] = useState<DirectPaymentProvider>('MERCADOPAGO');
   const [stage, setStage] = useState<Stage>('summary');
   const [loading, setLoading] = useState(false);
   const [checkingPayment, setCheckingPayment] = useState(false);
@@ -40,12 +48,8 @@ export default function CheckoutScreen() {
   const [errorMessage, setErrorMessage] = useState('Revisa el metodo seleccionado o intenta nuevamente.');
 
   const canContinue = useMemo(() => {
-    if (selectedMethod === 'expensas') {
-      return expensasUnit.trim().length > 0;
-    }
-
     return items.length > 0;
-  }, [expensasUnit, items.length, selectedMethod]);
+  }, [items.length]);
 
   useEffect(() => {
     if (stage !== 'paying' || !orderId) return;
@@ -108,13 +112,16 @@ export default function CheckoutScreen() {
     setErrorMessage('Revisa el metodo seleccionado o intenta nuevamente.');
 
     try {
-      const res = await createOrder(selectedMethod, expensasUnit.trim() || undefined);
+      const res = await createOrder(
+        selectedMethod,
+        selectedMethod === 'DIRECT' ? selectedProvider : undefined,
+      );
       const createdOrder = res.data.data.order;
       const payment = res.data.data.payment;
 
       setOrderId(createdOrder.id);
 
-      if (selectedMethod === 'mercadopago') {
+      if (selectedMethod === 'DIRECT' && selectedProvider === 'MERCADOPAGO') {
         const url = payment?.init_point || payment?.sandbox_init_point;
 
         if (!url) {
@@ -139,8 +146,10 @@ export default function CheckoutScreen() {
 
   if (stage === 'paying') {
     return (
-      <ScreenWrapper style={styles.centerContent}>
-        <Card variant="elevated" style={styles.stateCard}>
+      <ScreenWrapper>
+        <ScrollView contentContainerStyle={[styles.centerContent, isWide && styles.centerWide]} showsVerticalScrollIndicator={false}>
+        <Card variant="elevated" style={[styles.stateCard, isWide && styles.stateCardWide]}>
+          <BrandMark align="center" size="sm" />
           <View style={styles.stateIconInfo}>
             <Ionicons name="wallet-outline" size={28} color="#fff" />
           </View>
@@ -158,14 +167,17 @@ export default function CheckoutScreen() {
             <Text style={styles.backToSummary}>Cambiar metodo de pago</Text>
           </TouchableOpacity>
         </Card>
+        </ScrollView>
       </ScreenWrapper>
     );
   }
 
   if (stage === 'success') {
     return (
-      <ScreenWrapper style={styles.centerContent}>
-        <Card variant="elevated" style={styles.stateCard}>
+      <ScreenWrapper>
+        <ScrollView contentContainerStyle={[styles.centerContent, isWide && styles.centerWide]} showsVerticalScrollIndicator={false}>
+        <Card variant="elevated" style={[styles.stateCard, isWide && styles.stateCardWide]}>
+          <BrandMark align="center" size="sm" />
           <View style={styles.stateIconSuccess}>
             <Ionicons name="checkmark" size={28} color="#fff" />
           </View>
@@ -176,14 +188,17 @@ export default function CheckoutScreen() {
           <Button label="Escanear QR de salida" onPress={() => router.replace(`/(app)/qr-access?mode=exit&orderId=${orderId || ''}`)} />
           <Button label="Volver al inicio" variant="outline" onPress={() => router.replace('/(app)/home')} />
         </Card>
+        </ScrollView>
       </ScreenWrapper>
     );
   }
 
   if (stage === 'error') {
     return (
-      <ScreenWrapper style={styles.centerContent}>
-        <Card variant="elevated" style={styles.stateCard}>
+      <ScreenWrapper>
+        <ScrollView contentContainerStyle={[styles.centerContent, isWide && styles.centerWide]} showsVerticalScrollIndicator={false}>
+        <Card variant="elevated" style={[styles.stateCard, isWide && styles.stateCardWide]}>
+          <BrandMark align="center" size="sm" />
           <View style={styles.stateIconError}>
             <Ionicons name="close" size={28} color="#fff" />
           </View>
@@ -191,6 +206,7 @@ export default function CheckoutScreen() {
           <Text style={styles.stateBody}>{errorMessage}</Text>
           <Button label="Reintentar" onPress={() => setStage('summary')} />
         </Card>
+        </ScrollView>
       </ScreenWrapper>
     );
   }
@@ -206,14 +222,15 @@ export default function CheckoutScreen() {
           <View style={styles.headerSpacer} />
         </View>
 
-        <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
-          <Card variant="elevated" style={styles.heroCard}>
+        <ScrollView contentContainerStyle={[styles.content, isWide && styles.contentWide]} showsVerticalScrollIndicator={false}>
+          <Card variant="elevated" style={[styles.heroCard, isWide && styles.wideCard]}>
+            <BrandMark align="center" size="md" subtitle="Tu compra conserva el flujo simple: eliges como pagar y luego sales con QR." />
             <Text style={styles.heroLabel}>Resumen</Text>
             <Text style={styles.heroAmount}>${Number(total).toFixed(2)}</Text>
             <Text style={styles.heroHint}>{count} productos listos para checkout</Text>
           </Card>
 
-          <Card>
+          <Card style={isWide && styles.wideCard}>
             <Text style={styles.sectionTitle}>Tu compra</Text>
             {items.map((item) => (
               <View key={item.id} style={styles.lineItem}>
@@ -228,10 +245,10 @@ export default function CheckoutScreen() {
             ))}
           </Card>
 
-          <Card>
-            <Text style={styles.sectionTitle}>Metodo de pago</Text>
+          <Card style={isWide && styles.wideCard}>
+            <Text style={styles.sectionTitle}>Liquidacion</Text>
             <View style={styles.optionList}>
-              {PAYMENT_OPTIONS.map((option) => {
+              {PAYMENT_METHOD_OPTIONS.map((option) => {
                 const active = selectedMethod === option.id;
                 return (
                   <TouchableOpacity
@@ -252,32 +269,62 @@ export default function CheckoutScreen() {
               })}
             </View>
 
-            {selectedMethod === 'expensas' && (
-              <Input
-                label="Unidad o lote"
-                value={expensasUnit}
-                onChangeText={setExpensasUnit}
-                placeholder="Ej: Lote 18 - Casa 4"
-                hint="Se usara para imputar la compra a expensas."
-              />
+            {selectedMethod === 'DIRECT' ? (
+              <>
+                <Text style={styles.sectionTitleSecondary}>Proveedor de cobro</Text>
+                <View style={styles.optionList}>
+                  {DIRECT_PROVIDER_OPTIONS.map((option) => {
+                    const active = selectedProvider === option.id;
+                    return (
+                      <TouchableOpacity
+                        key={option.id}
+                        style={[styles.optionCard, active && styles.optionCardActive]}
+                        onPress={() => setSelectedProvider(option.id)}
+                      >
+                        <View style={[styles.optionIcon, active && styles.optionIconActive]}>
+                          <Ionicons name={option.icon} size={18} color={active ? '#fff' : Colors.primary} />
+                        </View>
+                        <View style={styles.optionBody}>
+                          <Text style={styles.optionTitle}>{option.title}</Text>
+                          <Text style={styles.optionText}>{option.body}</Text>
+                        </View>
+                        <View style={[styles.radio, active && styles.radioActive]} />
+                      </TouchableOpacity>
+                    );
+                  })}
+                </View>
+              </>
+            ) : (
+                <Card variant="flat" style={styles.infoCard}>
+                <Text style={styles.infoTitle}>Cargo al lote actual</Text>
+                <Text style={styles.infoText}>
+                  Si tu lote y tu perfil tienen permiso, el consumo quedara incluido en la liquidacion mensual de expensas.
+                </Text>
+              </Card>
             )}
           </Card>
-        </ScrollView>
 
-        <View style={styles.footer}>
-          <Card variant="elevated" style={styles.footerCard}>
+          <View style={[styles.footerInline, isWide && styles.wideCard]}>
+            <Card variant="elevated" style={styles.footerCard}>
             <View style={styles.footerRow}>
               <Text style={styles.footerLabel}>Total a pagar</Text>
               <Text style={styles.footerValue}>${Number(total).toFixed(2)}</Text>
             </View>
             <Button
-              label={selectedMethod === 'mercadopago' ? 'Continuar a Mercado Pago' : 'Confirmar pago'}
+              label={
+                selectedMethod === 'DIRECT' && selectedProvider === 'MERCADOPAGO'
+                  ? 'Continuar a Mercado Pago'
+                  : selectedMethod === 'EXPENSE'
+                    ? 'Imputar a expensas'
+                    : 'Confirmar pago'
+              }
               onPress={handleCheckout}
               loading={loading}
               disabled={!canContinue}
             />
-          </Card>
-        </View>
+            </Card>
+          </View>
+        </ScrollView>
       </View>
     </ScreenWrapper>
   );
@@ -298,45 +345,64 @@ const styles = StyleSheet.create({
   },
   backText: {
     color: Colors.primary,
+    fontFamily: FontFamilies.body,
     fontSize: FontSizes.md,
-    fontWeight: FontWeights.bold,
+    fontWeight: FontWeights.semibold,
   },
   headerTitle: {
-    color: Colors.text,
+    ...Typography.h3,
     fontSize: FontSizes.lg,
-    fontWeight: FontWeights.extrabold,
   },
   content: {
     paddingHorizontal: Spacing.md,
-    paddingBottom: 180,
+    paddingBottom: 120,
     gap: Spacing.md,
+    flexGrow: 1,
+  },
+  contentWide: {
+    alignItems: 'center',
   },
   heroCard: {
-    backgroundColor: Colors.primary,
-    ...Shadows.primaryGlow,
+    backgroundColor: Colors.surface,
+    borderWidth: 1,
+    borderColor: Colors.borderLight,
+    ...Shadows.lg,
+    width: '100%',
   },
   heroLabel: {
-    color: 'rgba(255,255,255,0.72)',
+    color: Colors.primarySoft,
+    fontFamily: FontFamilies.body,
     fontSize: FontSizes.xs,
     fontWeight: FontWeights.bold,
     textTransform: 'uppercase',
     letterSpacing: 1,
+    marginTop: Spacing.sm,
+    textAlign: 'center',
   },
   heroAmount: {
-    color: '#fff',
+    color: Colors.primary,
+    fontFamily: FontFamilies.editorial,
     fontSize: 42,
-    fontWeight: FontWeights.extrabold,
     marginTop: 8,
+    textAlign: 'center',
   },
   heroHint: {
-    color: 'rgba(255,255,255,0.82)',
+    color: Colors.textSecondary,
+    fontFamily: FontFamilies.body,
     fontSize: FontSizes.md,
     marginTop: 6,
+    textAlign: 'center',
   },
   sectionTitle: {
-    color: Colors.text,
+    ...Typography.h3,
     fontSize: FontSizes.lg,
-    fontWeight: FontWeights.extrabold,
+    marginBottom: Spacing.md,
+  },
+  sectionTitleSecondary: {
+    color: Colors.text,
+    fontFamily: FontFamilies.body,
+    fontSize: FontSizes.md,
+    fontWeight: FontWeights.semibold,
     marginBottom: Spacing.md,
   },
   lineItem: {
@@ -353,17 +419,19 @@ const styles = StyleSheet.create({
   },
   lineName: {
     color: Colors.text,
+    fontFamily: FontFamilies.body,
     fontSize: FontSizes.md,
-    fontWeight: FontWeights.bold,
+    fontWeight: FontWeights.semibold,
   },
   lineMeta: {
     color: Colors.textMuted,
+    fontFamily: FontFamilies.body,
     fontSize: FontSizes.xs,
   },
   linePrice: {
     color: Colors.text,
+    fontFamily: FontFamilies.editorial,
     fontSize: FontSizes.md,
-    fontWeight: FontWeights.bold,
   },
   optionList: {
     gap: Spacing.sm,
@@ -379,14 +447,14 @@ const styles = StyleSheet.create({
     gap: Spacing.md,
   },
   optionCardActive: {
-    borderColor: Colors.primary,
-    backgroundColor: Colors.primaryLight,
+    borderColor: Colors.primarySoft,
+    backgroundColor: Colors.primarySoftest,
   },
   optionIcon: {
     width: 40,
     height: 40,
     borderRadius: BorderRadius.lg,
-    backgroundColor: Colors.backgroundAlt,
+    backgroundColor: Colors.surfaceMuted,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -399,11 +467,13 @@ const styles = StyleSheet.create({
   },
   optionTitle: {
     color: Colors.text,
+    fontFamily: FontFamilies.body,
     fontSize: FontSizes.md,
-    fontWeight: FontWeights.bold,
+    fontWeight: FontWeights.semibold,
   },
   optionText: {
     color: Colors.textSecondary,
+    fontFamily: FontFamilies.body,
     fontSize: FontSizes.sm,
     lineHeight: 20,
   },
@@ -418,12 +488,26 @@ const styles = StyleSheet.create({
     borderColor: Colors.primary,
     backgroundColor: Colors.primary,
   },
+  infoCard: {
+    gap: Spacing.xs,
+  },
+  infoTitle: {
+    color: Colors.text,
+    fontFamily: FontFamilies.body,
+    fontSize: FontSizes.sm,
+    fontWeight: FontWeights.semibold,
+  },
+  infoText: {
+    color: Colors.textSecondary,
+    fontFamily: FontFamilies.body,
+    fontSize: FontSizes.sm,
+    lineHeight: 20,
+  },
   footer: {
-    position: 'absolute',
-    left: 0,
-    right: 0,
-    bottom: 92,
-    paddingHorizontal: Spacing.md,
+    display: 'none',
+  },
+  footerInline: {
+    width: '100%',
   },
   footerCard: {
     gap: Spacing.md,
@@ -441,16 +525,26 @@ const styles = StyleSheet.create({
   },
   footerValue: {
     color: Colors.text,
+    fontFamily: FontFamilies.editorial,
     fontSize: FontSizes.xxl,
-    fontWeight: FontWeights.extrabold,
   },
   centerContent: {
     padding: Spacing.md,
     justifyContent: 'center',
+    flexGrow: 1,
+  },
+  centerWide: {
+    alignItems: 'center',
   },
   stateCard: {
     alignItems: 'center',
     gap: Spacing.md,
+    backgroundColor: Colors.surface,
+    padding: Spacing.xl,
+    width: '100%',
+  },
+  stateCardWide: {
+    maxWidth: 760,
   },
   stateIconSuccess: {
     width: 64,
@@ -477,13 +571,12 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   stateTitle: {
-    color: Colors.text,
-    fontSize: FontSizes.xxl,
-    fontWeight: FontWeights.extrabold,
+    ...Typography.h2,
     textAlign: 'center',
   },
   stateBody: {
     color: Colors.textSecondary,
+    fontFamily: FontFamilies.body,
     fontSize: FontSizes.md,
     lineHeight: 22,
     textAlign: 'center',
@@ -496,16 +589,22 @@ const styles = StyleSheet.create({
     gap: Spacing.sm,
     paddingVertical: Spacing.md,
     borderRadius: BorderRadius.lg,
-    backgroundColor: Colors.primaryLight,
+    backgroundColor: Colors.primarySoftest,
   },
   waitingText: {
-    color: Colors.primaryDark,
+    color: Colors.primary,
+    fontFamily: FontFamilies.body,
     fontSize: FontSizes.sm,
     fontWeight: FontWeights.semibold,
   },
   backToSummary: {
     color: Colors.primary,
+    fontFamily: FontFamilies.body,
     fontSize: FontSizes.md,
-    fontWeight: FontWeights.bold,
+    fontWeight: FontWeights.semibold,
+  },
+  wideCard: {
+    width: '100%',
+    maxWidth: 1120,
   },
 });

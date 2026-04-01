@@ -6,18 +6,20 @@ import {
   StyleSheet,
   Text,
   TouchableOpacity,
+  useWindowDimensions,
   View,
 } from 'react-native';
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 
 import Badge from '../../components/ui/Badge';
+import BrandMark from '../../components/ui/BrandMark';
 import Button from '../../components/ui/Button';
 import Card from '../../components/ui/Card';
 import EmptyState from '../../components/ui/EmptyState';
 import ScreenWrapper from '../../components/ui/ScreenWrapper';
 import { SkeletonProductCard } from '../../components/ui/Skeleton';
-import { BorderRadius, Colors, FontSizes, FontWeights, Shadows, Spacing } from '../../constants/theme';
+import { BorderRadius, Colors, FontFamilies, FontSizes, FontWeights, Shadows, Spacing, Typography } from '../../constants/theme';
 import { useAuthStore } from '../../services/authStore';
 import { useCartStore } from '../../services/cartStore';
 import { getProducts } from '../../services/api';
@@ -35,6 +37,9 @@ interface Product {
 const CATEGORIES = ['Todos', 'Bebidas', 'Snacks', 'Lacteos', 'Carnes', 'Frutas'];
 
 export default function HomeScreen() {
+  const { width } = useWindowDimensions();
+  const isWide = width >= 960;
+  const isTablet = width >= 720;
   const { user } = useAuthStore();
   const { addItem, count } = useCartStore();
   const [products, setProducts] = useState<Product[]>([]);
@@ -79,36 +84,35 @@ export default function HomeScreen() {
   return (
     <ScreenWrapper>
       <ScrollView
-        contentContainerStyle={styles.content}
+        contentContainerStyle={[styles.content, isWide && styles.contentWide]}
         showsVerticalScrollIndicator={false}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={Colors.primary} />}
       >
-        <View style={styles.hero}>
-          <View style={styles.heroTop}>
-            <View>
-              <Text style={styles.eyebrow}>Rapid Inn</Text>
-              <Text style={styles.heroTitle}>Hola, {firstName}</Text>
-              <Text style={styles.heroSubtitle}>
-                Compra rapido, paga sin friccion y controla tu acceso desde una sola app.
-              </Text>
-            </View>
+        <View style={[styles.hero, isWide && styles.sectionWide]}>
+          <View style={[styles.heroTop, isTablet && styles.heroTopWide]}>
+            <BrandMark
+              variant="logo"
+              size={isTablet ? 'lg' : 'md'}
+              subtitle={`Hola, ${firstName}. Todo listo para comprar y moverte dentro del barrio con una experiencia tranquila.`}
+            />
             <TouchableOpacity style={styles.profileBubble} onPress={() => router.push('/(app)/profile')}>
               <Text style={styles.profileInitial}>{firstName.charAt(0).toUpperCase()}</Text>
             </TouchableOpacity>
           </View>
 
-          <Card variant="elevated" style={styles.heroCard}>
-            <View style={styles.heroCardRow}>
+          <Card variant="elevated" style={styles.statusCard}>
+            <View style={[styles.statusRow, !isTablet && styles.statusRowStack]}>
               <View>
-                <Text style={styles.heroCardLabel}>Estado de cuenta</Text>
-                <Text style={styles.heroCardValue}>{user?.verification_status === 'verified' ? 'Lista para ingresar' : 'Verificacion pendiente'}</Text>
+                <Text style={styles.statusLabel}>Estado de cuenta</Text>
+                <Text style={styles.statusValue}>
+                  {user?.verification_status === 'verified' ? 'Lista para entrar' : 'Verificacion pendiente'}
+                </Text>
               </View>
               <Badge
                 variant={user?.verification_status === 'verified' ? 'verified' : 'pending'}
                 label={user?.verification_status === 'verified' ? 'Verificada' : 'En proceso'}
               />
             </View>
-
             <View style={styles.metricGrid}>
               <MetricCard icon="bag-handle-outline" label="Carrito" value={`${count} item${count === 1 ? '' : 's'}`} />
               <MetricCard icon="qr-code-outline" label="Acceso" value="QR activo" />
@@ -116,42 +120,23 @@ export default function HomeScreen() {
           </Card>
         </View>
 
-        <View style={styles.actionsRow}>
-          <QuickAction
-            icon="scan-outline"
-            label="Escanear"
-            tone="primary"
-            onPress={() => router.push('/(app)/scanner')}
-          />
-          <QuickAction
-            icon="qr-code-outline"
-            label="Acceso QR"
-            tone="success"
-            onPress={() => router.push('/(app)/qr-access')}
-          />
-          <QuickAction
-            icon="wallet-outline"
-            label="Pagar"
-            tone="warning"
-            onPress={() => router.push('/(app)/cart')}
-          />
+        <View style={[styles.actionsRow, isWide && styles.sectionWide, !isTablet && styles.actionsColumn]}>
+          <QuickAction icon="scan-outline" label="Escanear" tone="primary" onPress={() => router.push('/(app)/scanner')} />
+          <QuickAction icon="qr-code-outline" label="Acceso QR" tone="success" onPress={() => router.push('/(app)/qr-access')} />
+          <QuickAction icon="wallet-outline" label="Pagar" tone="warning" onPress={() => router.push('/(app)/cart')} />
         </View>
 
-        <View style={styles.section}>
+        <View style={[styles.section, isWide && styles.sectionWide]}>
           <View style={styles.sectionHeader}>
-            <Text style={styles.sectionTitle}>Explorar categorias</Text>
-            <Text style={styles.sectionHint}>Seed y escaneo en un solo flujo</Text>
+            <Text style={styles.sectionTitle}>Categorias</Text>
+            <Text style={styles.sectionHint}>Compra simple, siempre disponible</Text>
           </View>
 
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chipsRow}>
             {CATEGORIES.map((category) => {
               const active = selectedCategory === category;
               return (
-                <TouchableOpacity
-                  key={category}
-                  style={[styles.chip, active && styles.chipActive]}
-                  onPress={() => handleCategory(category)}
-                >
+                <TouchableOpacity key={category} style={[styles.chip, active && styles.chipActive]} onPress={() => handleCategory(category)}>
                   <Text style={[styles.chipText, active && styles.chipTextActive]}>{category}</Text>
                 </TouchableOpacity>
               );
@@ -159,8 +144,8 @@ export default function HomeScreen() {
           </ScrollView>
         </View>
 
-        <View style={styles.section}>
-          <View style={styles.sectionHeader}>
+        <View style={[styles.section, isWide && styles.sectionWide]}>
+          <View style={[styles.sectionHeader, !isTablet && styles.sectionHeaderStack]}>
             <Text style={styles.sectionTitle}>Productos destacados</Text>
             <Button label="Ver carrito" variant="ghost" size="sm" fullWidth={false} onPress={() => router.push('/(app)/cart')} />
           </View>
@@ -174,15 +159,15 @@ export default function HomeScreen() {
           ) : products.length === 0 ? (
             <Card>
               <EmptyState
-                icon="📦"
+                icon="[]"
                 title="No hay productos para mostrar"
                 subtitle="Prueba otra categoria o actualiza la pantalla."
               />
             </Card>
           ) : (
-            <View style={styles.grid}>
+            <View style={[styles.grid, isTablet && styles.gridWide]}>
               {products.map((product) => (
-                <ProductTile key={product.id} product={product} onAdd={() => handleAddToCart(product)} />
+                <ProductTile key={product.id} product={product} onAdd={() => handleAddToCart(product)} cardStyle={isTablet ? styles.productCardWide : undefined} />
               ))}
             </View>
           )}
@@ -204,8 +189,8 @@ function QuickAction({
   onPress: () => void;
 }) {
   const toneMap = {
-    primary: { bg: Colors.primaryLight, color: Colors.primary },
-    success: { bg: Colors.successLight, color: Colors.success },
+    primary: { bg: Colors.primarySoftest, color: Colors.primary },
+    success: { bg: Colors.successLight, color: Colors.successDark },
     warning: { bg: Colors.warningLight, color: Colors.warningDark },
   }[tone];
 
@@ -240,12 +225,14 @@ function MetricCard({
 function ProductTile({
   product,
   onAdd,
+  cardStyle,
 }: {
   product: Product;
   onAdd: () => void;
+  cardStyle?: any;
 }) {
   return (
-    <Card style={styles.productCard}>
+    <Card style={[styles.productCard, cardStyle]}>
       <View style={styles.productMedia}>
         {product.image_url ? (
           <Image source={{ uri: product.image_url }} style={styles.productImage} resizeMode="cover" />
@@ -271,72 +258,74 @@ const styles = StyleSheet.create({
     paddingTop: Spacing.sm,
     paddingBottom: 110,
     gap: Spacing.lg,
+    flexGrow: 1,
+  },
+  contentWide: {
+    alignItems: 'center',
   },
   hero: {
-    backgroundColor: Colors.primary,
-    borderRadius: BorderRadius.xxl,
-    padding: Spacing.lg,
-    gap: Spacing.lg,
-    ...Shadows.primaryGlow,
+    gap: Spacing.md,
+    width: '100%',
+  },
+  sectionWide: {
+    width: '100%',
+    maxWidth: 1120,
   },
   heroTop: {
+    backgroundColor: Colors.surface,
+    borderRadius: BorderRadius.xxl,
+    padding: Spacing.lg,
     flexDirection: 'row',
     justifyContent: 'space-between',
+    alignItems: 'flex-start',
     gap: Spacing.md,
+    ...Shadows.lg,
   },
-  eyebrow: {
-    color: 'rgba(255,255,255,0.72)',
-    fontSize: FontSizes.xs,
-    fontWeight: FontWeights.bold,
-    textTransform: 'uppercase',
-    letterSpacing: 1.2,
-  },
-  heroTitle: {
-    color: '#fff',
-    fontSize: FontSizes.display,
-    fontWeight: FontWeights.extrabold,
-    marginTop: 6,
-  },
-  heroSubtitle: {
-    color: 'rgba(255,255,255,0.82)',
-    fontSize: FontSizes.md,
-    lineHeight: 22,
-    marginTop: 6,
-    maxWidth: 260,
+  heroTopWide: {
+    alignItems: 'center',
   },
   profileBubble: {
-    width: 48,
-    height: 48,
+    width: 52,
+    height: 52,
     borderRadius: BorderRadius.full,
-    backgroundColor: 'rgba(255,255,255,0.18)',
+    backgroundColor: Colors.surfaceMuted,
     alignItems: 'center',
     justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: Colors.border,
   },
   profileInitial: {
-    color: '#fff',
+    color: Colors.primary,
+    fontFamily: FontFamilies.editorial,
     fontSize: FontSizes.lg,
-    fontWeight: FontWeights.bold,
   },
-  heroCard: {
-    backgroundColor: 'rgba(255,255,255,0.98)',
+  statusCard: {
+    backgroundColor: Colors.surface,
+    borderWidth: 1,
+    borderColor: Colors.borderLight,
   },
-  heroCardRow: {
+  statusRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
     marginBottom: Spacing.md,
   },
-  heroCardLabel: {
-    color: Colors.textMuted,
+  statusRowStack: {
+    flexDirection: 'column',
+    alignItems: 'flex-start',
+    gap: Spacing.sm,
+  },
+  statusLabel: {
+    color: Colors.primarySoft,
+    fontFamily: FontFamilies.body,
     fontSize: FontSizes.xs,
     textTransform: 'uppercase',
     letterSpacing: 1,
     fontWeight: FontWeights.bold,
   },
-  heroCardValue: {
-    color: Colors.text,
+  statusValue: {
+    ...Typography.h3,
     fontSize: FontSizes.xl,
-    fontWeight: FontWeights.extrabold,
     marginTop: 4,
   },
   metricGrid: {
@@ -345,30 +334,37 @@ const styles = StyleSheet.create({
   },
   metricCard: {
     flex: 1,
-    backgroundColor: Colors.background,
+    backgroundColor: Colors.surfaceMuted,
     borderRadius: BorderRadius.lg,
     padding: Spacing.md,
     gap: 6,
   },
   metricLabel: {
     color: Colors.textSecondary,
+    fontFamily: FontFamilies.body,
     fontSize: FontSizes.xs,
     fontWeight: FontWeights.semibold,
   },
   metricValue: {
     color: Colors.text,
+    fontFamily: FontFamilies.body,
     fontSize: FontSizes.md,
-    fontWeight: FontWeights.bold,
+    fontWeight: FontWeights.semibold,
   },
   actionsRow: {
     flexDirection: 'row',
     gap: Spacing.sm,
+    width: '100%',
+  },
+  actionsColumn: {
+    flexDirection: 'column',
   },
   quickCard: {
     flex: 1,
     alignItems: 'center',
     gap: Spacing.sm,
     paddingVertical: Spacing.md,
+    backgroundColor: Colors.surface,
   },
   quickIconWrap: {
     width: 48,
@@ -379,6 +375,7 @@ const styles = StyleSheet.create({
   },
   quickLabel: {
     color: Colors.text,
+    fontFamily: FontFamilies.body,
     fontSize: FontSizes.sm,
     fontWeight: FontWeights.semibold,
   },
@@ -391,13 +388,17 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: Spacing.md,
   },
+  sectionHeaderStack: {
+    flexDirection: 'column',
+    alignItems: 'flex-start',
+  },
   sectionTitle: {
-    color: Colors.text,
+    ...Typography.h3,
     fontSize: FontSizes.xl,
-    fontWeight: FontWeights.extrabold,
   },
   sectionHint: {
     color: Colors.textSecondary,
+    fontFamily: FontFamilies.body,
     fontSize: FontSizes.sm,
   },
   chipsRow: {
@@ -412,16 +413,17 @@ const styles = StyleSheet.create({
     borderColor: Colors.border,
   },
   chipActive: {
-    backgroundColor: Colors.primary,
-    borderColor: Colors.primary,
+    backgroundColor: Colors.primarySoftest,
+    borderColor: Colors.primarySoft,
   },
   chipText: {
     color: Colors.textSecondary,
+    fontFamily: FontFamilies.body,
     fontSize: FontSizes.sm,
     fontWeight: FontWeights.semibold,
   },
   chipTextActive: {
-    color: '#fff',
+    color: Colors.primary,
   },
   grid: {
     flexDirection: 'row',
@@ -429,15 +431,22 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     gap: Spacing.md,
   },
+  gridWide: {
+    justifyContent: 'flex-start',
+  },
   productCard: {
     width: '47.5%',
     padding: Spacing.sm,
     gap: Spacing.sm,
+    backgroundColor: Colors.surface,
+  },
+  productCardWide: {
+    width: '31.5%',
   },
   productMedia: {
     height: 110,
     borderRadius: BorderRadius.lg,
-    backgroundColor: Colors.backgroundAlt,
+    backgroundColor: Colors.surfaceMuted,
     alignItems: 'center',
     justifyContent: 'center',
     overflow: 'hidden',
@@ -452,6 +461,7 @@ const styles = StyleSheet.create({
   },
   productCategory: {
     color: Colors.textMuted,
+    fontFamily: FontFamilies.body,
     fontSize: FontSizes.xs,
     textTransform: 'uppercase',
     letterSpacing: 0.8,
@@ -459,13 +469,14 @@ const styles = StyleSheet.create({
   },
   productName: {
     color: Colors.text,
+    fontFamily: FontFamilies.body,
     fontSize: FontSizes.md,
-    fontWeight: FontWeights.bold,
+    fontWeight: FontWeights.semibold,
     lineHeight: 20,
   },
   productPrice: {
     color: Colors.primary,
+    fontFamily: FontFamilies.editorial,
     fontSize: FontSizes.xl,
-    fontWeight: FontWeights.extrabold,
   },
 });

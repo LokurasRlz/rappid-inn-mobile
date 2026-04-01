@@ -9,10 +9,46 @@ const AUTH_TOKEN_KEY = 'auth_token';
 
 export interface User {
   id: number;
+  neighborhood_id?: number;
+  neighborhood?: {
+    id: number;
+    name: string;
+    slug: string;
+  };
+  neighborhood_features?: {
+    expensas_enabled: boolean;
+    kyc_required: boolean;
+    qr_access_enabled: boolean;
+  };
   name: string;
   email: string;
   avatar_url?: string;
   role: string;
+  onboarding_state?: 'active' | 'pending_validation' | 'rejected' | 'requires_action';
+  onboarding_reason?: string | null;
+  current_lot_id?: number | null;
+  current_lot?: {
+    id: number;
+    code: string;
+    name: string;
+    expenses_enabled: boolean;
+  } | null;
+  current_lot_member?: {
+    id: number;
+    role: string;
+    can_access_store: boolean;
+    can_charge_expenses: boolean;
+    can_manage_members: boolean;
+    spending_limit?: number | null;
+  } | null;
+  latest_incident?: {
+    id: number;
+    category: string;
+    risk_level: 'NORMAL' | 'OBSERVED' | 'REVIEW' | 'BLOCKED';
+    status: string;
+    blocked_access: boolean;
+    restrict_expenses: boolean;
+  } | null;
   dni?: string;
   birth_date?: string;
   phone?: string;
@@ -24,6 +60,17 @@ export interface User {
   has_selfie?: boolean;
   cart_count?: number;
   cart_total?: number;
+  lot_memberships?: Array<{
+    lot_id: number;
+    lot_name: string;
+    lot_code: string;
+    role: string;
+    status: string;
+    can_access_store: boolean;
+    can_charge_expenses: boolean;
+    can_manage_members: boolean;
+    spending_limit?: number | null;
+  }>;
 }
 
 interface AuthState {

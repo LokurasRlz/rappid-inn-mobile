@@ -1,14 +1,16 @@
-import React, { useState, useRef, useEffect } from 'react';
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, KeyboardAvoidingView, Platform } from 'react-native';
+import React, { useEffect, useRef, useState } from 'react';
+import { KeyboardAvoidingView, Platform, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import Toast from 'react-native-toast-message';
-import ScreenWrapper from '../../components/ui/ScreenWrapper';
+
+import BrandMark from '../../components/ui/BrandMark';
 import Button from '../../components/ui/Button';
 import Card from '../../components/ui/Card';
+import ScreenWrapper from '../../components/ui/ScreenWrapper';
 import { sendOtp, verifyOtp } from '../../services/api';
 import { useAuthStore } from '../../services/authStore';
-import { Colors, Spacing, FontSizes, FontWeights, BorderRadius, Shadows } from '../../constants/theme';
+import { BorderRadius, Colors, FontFamilies, FontSizes, FontWeights, Shadows, Spacing, Typography } from '../../constants/theme';
 
 export default function VerifyOtpScreen() {
   const { user, updateVerification } = useAuthStore();
@@ -22,13 +24,16 @@ export default function VerifyOtpScreen() {
 
   useEffect(() => {
     if (timer > 0) {
-      const t = setTimeout(() => setTimer(v => v - 1), 1000);
+      const t = setTimeout(() => setTimer((v) => v - 1), 1000);
       return () => clearTimeout(t);
     }
   }, [timer]);
 
   const handleSend = async () => {
-    if (!phone) { Toast.show({ type: 'error', text1: 'Ingresá tu teléfono' }); return; }
+    if (!phone) {
+      Toast.show({ type: 'error', text1: 'Ingresa tu telefono' });
+      return;
+    }
     setLoading(true);
     try {
       const res = await sendOtp(phone);
@@ -36,7 +41,7 @@ export default function VerifyOtpScreen() {
       setTimer(60);
       if (res.data.debug_otp) {
         setDebugOtp(res.data.debug_otp);
-        Toast.show({ type: 'info', text1: '🔧 Debug OTP', text2: `Código: ${res.data.debug_otp}`, visibilityTime: 8000 });
+        Toast.show({ type: 'info', text1: 'Debug OTP', text2: `Codigo: ${res.data.debug_otp}`, visibilityTime: 8000 });
       }
       setTimeout(() => inputRef.current?.focus(), 300);
     } catch (e: any) {
@@ -47,15 +52,18 @@ export default function VerifyOtpScreen() {
   };
 
   const handleVerify = async () => {
-    if (otp.length !== 6) { Toast.show({ type: 'error', text1: 'El código tiene 6 dígitos' }); return; }
+    if (otp.length !== 6) {
+      Toast.show({ type: 'error', text1: 'El codigo tiene 6 digitos' });
+      return;
+    }
     setLoading(true);
     try {
       await verifyOtp(otp);
       updateVerification('pending');
-      Toast.show({ type: 'success', text1: 'Teléfono verificado ✓' });
+      Toast.show({ type: 'success', text1: 'Telefono verificado' });
       router.push('/(auth)/verify-selfie');
     } catch (e: any) {
-      Toast.show({ type: 'error', text1: 'Código incorrecto', text2: e?.response?.data?.error || 'Intentá de nuevo' });
+      Toast.show({ type: 'error', text1: 'Codigo incorrecto', text2: e?.response?.data?.error || 'Intenta de nuevo' });
     } finally {
       setLoading(false);
     }
@@ -70,29 +78,26 @@ export default function VerifyOtpScreen() {
             <Text style={styles.backText}>Volver</Text>
           </TouchableOpacity>
 
-          <View style={styles.hero}>
-            <View style={styles.iconWrap}>
-              <Text style={{ fontSize: 40 }}>📱</Text>
-            </View>
-            <Text style={styles.title}>Verificar teléfono</Text>
-            <Text style={styles.subtitle}>
-              {sent ? `Enviamos un código SMS a ${phone}` : 'Ingresá tu número para recibir el código'}
-            </Text>
-          </View>
+          <Card variant="elevated" style={styles.heroCard}>
+            <BrandMark
+              size="md"
+              subtitle={sent ? `Enviamos un codigo a ${phone}.` : 'Confirma tu telefono para seguir con la verificacion.'}
+            />
+          </Card>
 
-          {debugOtp && (
+          {debugOtp ? (
             <Card style={styles.debugCard} variant="outlined">
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                <Ionicons name="construct-outline" size={18} color={Colors.warning} />
-                <Text style={styles.debugText}>Debug: código {debugOtp}</Text>
+              <View style={styles.debugRow}>
+                <Ionicons name="construct-outline" size={18} color={Colors.warningDark} />
+                <Text style={styles.debugText}>Debug: codigo {debugOtp}</Text>
               </View>
             </Card>
-          )}
+          ) : null}
 
           <Card style={styles.formCard}>
             {!sent ? (
               <>
-                <Text style={styles.inputLabel}>Teléfono</Text>
+                <Text style={styles.inputLabel}>Telefono</Text>
                 <TextInput
                   style={styles.phoneInput}
                   value={phone}
@@ -101,29 +106,25 @@ export default function VerifyOtpScreen() {
                   keyboardType="phone-pad"
                   placeholderTextColor={Colors.textMuted}
                 />
-                <Button label="Enviar código" onPress={handleSend} loading={loading} size="lg" />
+                <Button label="Enviar codigo" onPress={handleSend} loading={loading} size="lg" />
               </>
             ) : (
               <>
-                <Text style={styles.inputLabel}>Código de verificación</Text>
+                <Text style={styles.inputLabel}>Codigo de verificacion</Text>
                 <TextInput
                   ref={inputRef}
                   style={styles.otpInput}
                   value={otp}
-                  onChangeText={t => setOtp(t.replace(/\D/g, '').slice(0, 6))}
+                  onChangeText={(t) => setOtp(t.replace(/\D/g, '').slice(0, 6))}
                   placeholder="000000"
                   keyboardType="number-pad"
                   maxLength={6}
                   placeholderTextColor={Colors.textMuted}
                 />
-                <Button label="Verificar código" onPress={handleVerify} loading={loading} disabled={otp.length !== 6} size="lg" />
-                <TouchableOpacity
-                  onPress={timer === 0 ? handleSend : undefined}
-                  disabled={timer > 0}
-                  style={styles.resendBtn}
-                >
+                <Button label="Verificar codigo" onPress={handleVerify} loading={loading} disabled={otp.length !== 6} size="lg" />
+                <TouchableOpacity onPress={timer === 0 ? handleSend : undefined} disabled={timer > 0} style={styles.resendBtn}>
                   <Text style={[styles.resendText, timer > 0 && { color: Colors.textMuted }]}>
-                    {timer > 0 ? `Reenviar en ${timer}s` : 'Reenviar código'}
+                    {timer > 0 ? `Reenviar en ${timer}s` : 'Reenviar codigo'}
                   </Text>
                 </TouchableOpacity>
               </>
@@ -136,32 +137,42 @@ export default function VerifyOtpScreen() {
 }
 
 const styles = StyleSheet.create({
-  inner: { flex: 1, paddingHorizontal: Spacing.lg },
-  back: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: Spacing.md },
-  backText: { fontSize: FontSizes.md, color: Colors.textSecondary, fontWeight: FontWeights.medium },
-  hero: { alignItems: 'center', marginVertical: Spacing.xl, gap: Spacing.sm },
-  iconWrap: {
-    width: 80, height: 80, borderRadius: 24,
-    backgroundColor: Colors.primaryLight, alignItems: 'center', justifyContent: 'center',
-    marginBottom: Spacing.sm,
+  inner: { flex: 1, padding: Spacing.lg, gap: Spacing.md },
+  back: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  backText: { fontSize: FontSizes.md, color: Colors.textSecondary, fontFamily: FontFamilies.body, fontWeight: FontWeights.medium },
+  heroCard: {
+    backgroundColor: Colors.surface,
+    borderWidth: 1,
+    borderColor: Colors.borderLight,
+    ...Shadows.lg,
   },
-  title: { fontSize: FontSizes.xxl, fontWeight: FontWeights.extrabold, color: Colors.text },
-  subtitle: { fontSize: FontSizes.md, color: Colors.textSecondary, textAlign: 'center', lineHeight: 22 },
-  debugCard: { marginBottom: Spacing.md, borderColor: Colors.warning, padding: Spacing.md },
-  debugText: { fontSize: FontSizes.md, fontWeight: FontWeights.bold, color: Colors.warning },
+  debugCard: { borderColor: Colors.warningDark, padding: Spacing.md },
+  debugRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  debugText: { fontSize: FontSizes.md, fontFamily: FontFamilies.body, color: Colors.warningDark, fontWeight: FontWeights.semibold },
   formCard: { gap: Spacing.md, padding: Spacing.lg },
-  inputLabel: { fontSize: FontSizes.sm, fontWeight: FontWeights.semibold, color: Colors.text },
+  inputLabel: { fontSize: FontSizes.sm, fontFamily: FontFamilies.body, fontWeight: FontWeights.semibold, color: Colors.textSecondary },
   phoneInput: {
-    borderWidth: 1.5, borderColor: Colors.border, borderRadius: BorderRadius.md,
-    paddingHorizontal: 14, height: 52, fontSize: FontSizes.md, color: Colors.text,
+    borderWidth: 1.2,
+    borderColor: Colors.border,
+    borderRadius: BorderRadius.lg,
+    paddingHorizontal: 14,
+    height: 56,
+    fontSize: FontSizes.md,
+    color: Colors.text,
     backgroundColor: Colors.surface,
   },
   otpInput: {
-    borderWidth: 2, borderColor: Colors.primary, borderRadius: BorderRadius.md,
-    height: 64, fontSize: FontSizes.xxxl, fontWeight: FontWeights.extrabold,
-    letterSpacing: 16, textAlign: 'center', color: Colors.text,
-    backgroundColor: Colors.primaryLight,
+    borderWidth: 1.5,
+    borderColor: Colors.primarySoft,
+    borderRadius: BorderRadius.lg,
+    height: 68,
+    fontSize: FontSizes.xxxl,
+    fontFamily: FontFamilies.editorial,
+    letterSpacing: 14,
+    textAlign: 'center',
+    color: Colors.text,
+    backgroundColor: Colors.primarySoftest,
   },
   resendBtn: { alignItems: 'center', paddingVertical: Spacing.sm },
-  resendText: { fontSize: FontSizes.md, color: Colors.primary, fontWeight: FontWeights.semibold },
+  resendText: { fontSize: FontSizes.md, color: Colors.primary, fontFamily: FontFamilies.body, fontWeight: FontWeights.semibold },
 });

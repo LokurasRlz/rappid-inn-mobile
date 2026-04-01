@@ -2,11 +2,13 @@ import { User } from './authStore';
 
 export function requiresIdentityVerification(user: User | null) {
   if (!user) return false;
+  if (user.onboarding_state && user.onboarding_state !== 'active') return false;
   return user.role !== 'admin';
 }
 
 export function getVerificationRoute(user: User | null) {
   if (!user) return '/(auth)/welcome';
+  if (user.onboarding_state && user.onboarding_state !== 'active') return '/(auth)/pending-access';
   if (!requiresIdentityVerification(user)) return '/(app)/home';
   if (user.verification_status === 'verified') return '/(app)/home';
 

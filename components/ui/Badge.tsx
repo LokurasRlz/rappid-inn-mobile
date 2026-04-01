@@ -1,7 +1,7 @@
 import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { Colors, BorderRadius, FontSizes, FontWeights } from '../../constants/theme';
+import { BorderRadius, Colors, FontFamilies, FontSizes, FontWeights } from '../../constants/theme';
 
 type BadgeVariant = 'verified' | 'pending' | 'unverified' | 'success' | 'error' | 'warning' | 'info' | 'primary';
 
@@ -44,8 +44,8 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 5,
-    paddingHorizontal: 10,
-    paddingVertical: 5,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
     borderRadius: BorderRadius.full,
     alignSelf: 'flex-start',
   },
@@ -54,6 +54,7 @@ const styles = StyleSheet.create({
     paddingVertical: 3,
   },
   label: {
+    fontFamily: FontFamilies.body,
     fontSize: FontSizes.sm,
     fontWeight: FontWeights.semibold,
   },

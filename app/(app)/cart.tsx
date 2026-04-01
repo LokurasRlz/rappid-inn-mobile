@@ -1,25 +1,21 @@
 import { useEffect, useState } from 'react';
-import {
-  Alert,
-  FlatList,
-  Image,
-  StyleSheet,
-  Text,
-  TouchableOpacity,
-  View,
-} from 'react-native';
+import { Alert, FlatList, Image, StyleSheet, Text, TouchableOpacity, useWindowDimensions, View } from 'react-native';
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 
+import BrandMark from '../../components/ui/BrandMark';
 import Button from '../../components/ui/Button';
 import Card from '../../components/ui/Card';
 import EmptyState from '../../components/ui/EmptyState';
 import ScreenWrapper from '../../components/ui/ScreenWrapper';
 import { SkeletonList } from '../../components/ui/Skeleton';
-import { BorderRadius, Colors, FontSizes, FontWeights, Shadows, Spacing } from '../../constants/theme';
+import { BorderRadius, Colors, FontFamilies, FontSizes, FontWeights, Shadows, Spacing, Typography } from '../../constants/theme';
 import { CartItem, useCartStore } from '../../services/cartStore';
 
 export default function CartScreen() {
+  const { width } = useWindowDimensions();
+  const isWide = width >= 960;
+  const isTablet = width >= 720;
   const { items, total, count, isLoading, fetchCart, updateItem, removeItem, clearAll } = useCartStore();
   const [updatingId, setUpdatingId] = useState<number | null>(null);
 
@@ -42,14 +38,14 @@ export default function CartScreen() {
   };
 
   const handleRemove = (id: number) => {
-    Alert.alert('Quitar producto', 'Se eliminará este producto del carrito.', [
+    Alert.alert('Quitar producto', 'Se eliminara este producto del carrito.', [
       { text: 'Cancelar', style: 'cancel' },
       { text: 'Eliminar', style: 'destructive', onPress: () => removeItem(id) },
     ]);
   };
 
   const handleClear = () => {
-    Alert.alert('Vaciar carrito', 'Se eliminarán todos los productos actuales.', [
+    Alert.alert('Vaciar carrito', 'Se eliminaran todos los productos actuales.', [
       { text: 'Cancelar', style: 'cancel' },
       { text: 'Vaciar', style: 'destructive', onPress: clearAll },
     ]);
@@ -58,18 +54,6 @@ export default function CartScreen() {
   return (
     <ScreenWrapper>
       <View style={styles.container}>
-        <View style={styles.header}>
-          <View>
-            <Text style={styles.headerTitle}>Tu carrito</Text>
-            <Text style={styles.headerSubtitle}>Revisa cantidades y pasa a pago cuando quieras.</Text>
-          </View>
-          {items.length > 0 && (
-            <TouchableOpacity style={styles.headerAction} onPress={handleClear}>
-              <Text style={styles.headerActionText}>Vaciar</Text>
-            </TouchableOpacity>
-          )}
-        </View>
-
         {isLoading ? (
           <View style={styles.loaderWrap}>
             <SkeletonList count={3} />
@@ -77,9 +61,9 @@ export default function CartScreen() {
         ) : items.length === 0 ? (
           <Card style={styles.emptyCard}>
             <EmptyState
-              icon="🛍️"
-              title="Todavía no agregaste productos"
-              subtitle="Escanea o agrega productos desde inicio para verlos aquí."
+              icon="[]"
+              title="Todavia no agregaste productos"
+              subtitle="Escanea o agrega productos desde inicio para verlos aqui."
               actionLabel="Ir a escanear"
               onAction={() => router.push('/(app)/scanner')}
             />
@@ -89,8 +73,38 @@ export default function CartScreen() {
             <FlatList
               data={items}
               keyExtractor={(item) => String(item.id)}
-              contentContainerStyle={styles.list}
+              contentContainerStyle={[styles.list, isWide && styles.listWide]}
               showsVerticalScrollIndicator={false}
+              ListHeaderComponent={(
+                <View style={[styles.header, isWide && styles.sectionWide]}>
+                  <View style={styles.headerCopy}>
+                    <Card variant="elevated" style={styles.heroCard}>
+                      <BrandMark align="center" size={isTablet ? 'lg' : 'md'} subtitle="Revisa tus productos antes de pasar al pago." />
+                    </Card>
+                    <Text style={styles.headerTitle}>Tu carrito</Text>
+                  </View>
+                  {items.length > 0 ? (
+                    <TouchableOpacity style={styles.headerAction} onPress={handleClear}>
+                      <Text style={styles.headerActionText}>Vaciar</Text>
+                    </TouchableOpacity>
+                  ) : null}
+                </View>
+              )}
+              ListFooterComponent={(
+                <View style={[styles.footerInline, isWide && styles.sectionWide]}>
+                  <Card variant="elevated" style={styles.summaryCard}>
+                    <View style={styles.summaryRow}>
+                      <Text style={styles.summaryLabel}>Productos</Text>
+                      <Text style={styles.summaryValue}>{count}</Text>
+                    </View>
+                    <View style={styles.summaryRow}>
+                      <Text style={styles.summaryLabel}>Total</Text>
+                      <Text style={styles.summaryTotal}>${total.toFixed(2)}</Text>
+                    </View>
+                    <Button label="Continuar al pago" onPress={() => router.push('/(app)/checkout')} />
+                  </Card>
+                </View>
+              )}
               renderItem={({ item }) => (
                 <CartRow
                   item={item}
@@ -101,20 +115,6 @@ export default function CartScreen() {
                 />
               )}
             />
-
-            <View style={styles.footer}>
-              <Card variant="elevated" style={styles.summaryCard}>
-                <View style={styles.summaryRow}>
-                  <Text style={styles.summaryLabel}>Productos</Text>
-                  <Text style={styles.summaryValue}>{count}</Text>
-                </View>
-                <View style={styles.summaryRow}>
-                  <Text style={styles.summaryLabel}>Total</Text>
-                  <Text style={styles.summaryTotal}>${total.toFixed(2)}</Text>
-                </View>
-                <Button label="Continuar al pago" onPress={() => router.push('/(app)/checkout')} />
-              </Card>
-            </View>
           </>
         )}
       </View>
@@ -170,11 +170,8 @@ function CartRow({
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-  },
+  container: { flex: 1 },
   header: {
-    paddingHorizontal: Spacing.md,
     paddingTop: Spacing.sm,
     paddingBottom: Spacing.md,
     flexDirection: 'row',
@@ -182,15 +179,19 @@ const styles = StyleSheet.create({
     alignItems: 'flex-start',
     gap: Spacing.md,
   },
-  headerTitle: {
-    color: Colors.text,
-    fontSize: FontSizes.xxxl,
-    fontWeight: FontWeights.extrabold,
+  headerCopy: {
+    flex: 1,
+    gap: Spacing.sm,
   },
-  headerSubtitle: {
-    color: Colors.textSecondary,
-    fontSize: FontSizes.md,
-    marginTop: 6,
+  heroCard: {
+    backgroundColor: Colors.surface,
+    borderWidth: 1,
+    borderColor: Colors.borderLight,
+    padding: Spacing.lg,
+  },
+  headerTitle: {
+    ...Typography.h2,
+    paddingHorizontal: Spacing.xs,
   },
   headerAction: {
     backgroundColor: Colors.errorLight,
@@ -199,9 +200,10 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
   },
   headerActionText: {
-    color: Colors.error,
+    color: Colors.errorDark,
+    fontFamily: FontFamilies.body,
     fontSize: FontSizes.sm,
-    fontWeight: FontWeights.bold,
+    fontWeight: FontWeights.semibold,
   },
   loaderWrap: {
     paddingHorizontal: Spacing.md,
@@ -214,19 +216,26 @@ const styles = StyleSheet.create({
   },
   list: {
     paddingHorizontal: Spacing.md,
-    paddingBottom: 180,
+    paddingBottom: 120,
     gap: Spacing.md,
+    flexGrow: 1,
+  },
+  listWide: {
+    alignItems: 'center',
   },
   rowCard: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: Spacing.md,
+    backgroundColor: Colors.surface,
+    width: '100%',
+    maxWidth: 1120,
   },
   rowMedia: {
     width: 72,
     height: 72,
     borderRadius: BorderRadius.lg,
-    backgroundColor: Colors.backgroundAlt,
+    backgroundColor: Colors.surfaceMuted,
     alignItems: 'center',
     justifyContent: 'center',
     overflow: 'hidden',
@@ -241,19 +250,21 @@ const styles = StyleSheet.create({
   },
   rowName: {
     color: Colors.text,
+    fontFamily: FontFamilies.body,
     fontSize: FontSizes.md,
-    fontWeight: FontWeights.bold,
+    fontWeight: FontWeights.semibold,
     lineHeight: 20,
   },
   rowMeta: {
     color: Colors.textMuted,
+    fontFamily: FontFamilies.body,
     fontSize: FontSizes.xs,
     fontWeight: FontWeights.semibold,
   },
   rowPrice: {
     color: Colors.primary,
+    fontFamily: FontFamilies.editorial,
     fontSize: FontSizes.xl,
-    fontWeight: FontWeights.extrabold,
   },
   stepper: {
     alignItems: 'center',
@@ -263,14 +274,15 @@ const styles = StyleSheet.create({
     width: 34,
     height: 34,
     borderRadius: BorderRadius.full,
-    backgroundColor: Colors.backgroundAlt,
+    backgroundColor: Colors.surfaceMuted,
     alignItems: 'center',
     justifyContent: 'center',
   },
   stepperValue: {
     color: Colors.text,
+    fontFamily: FontFamilies.body,
     fontSize: FontSizes.md,
-    fontWeight: FontWeights.bold,
+    fontWeight: FontWeights.semibold,
     minWidth: 28,
     textAlign: 'center',
   },
@@ -282,16 +294,15 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  footer: {
-    position: 'absolute',
-    left: 0,
-    right: 0,
-    bottom: 92,
-    paddingHorizontal: Spacing.md,
+  footerInline: {
+    width: '100%',
+    marginTop: Spacing.md,
   },
   summaryCard: {
     gap: Spacing.md,
+    backgroundColor: Colors.surface,
     ...Shadows.lg,
+    width: '100%',
   },
   summaryRow: {
     flexDirection: 'row',
@@ -300,17 +311,23 @@ const styles = StyleSheet.create({
   },
   summaryLabel: {
     color: Colors.textSecondary,
+    fontFamily: FontFamilies.body,
     fontSize: FontSizes.sm,
     fontWeight: FontWeights.semibold,
   },
   summaryValue: {
     color: Colors.text,
+    fontFamily: FontFamilies.body,
     fontSize: FontSizes.md,
-    fontWeight: FontWeights.bold,
+    fontWeight: FontWeights.semibold,
   },
   summaryTotal: {
     color: Colors.text,
+    fontFamily: FontFamilies.editorial,
     fontSize: FontSizes.xxl,
-    fontWeight: FontWeights.extrabold,
+  },
+  sectionWide: {
+    width: '100%',
+    maxWidth: 1120,
   },
 });

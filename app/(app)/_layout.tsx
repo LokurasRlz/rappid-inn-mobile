@@ -3,8 +3,9 @@ import { Redirect, Tabs } from 'expo-router';
 import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 
+import BrandMark from '../../components/ui/BrandMark';
 import ScreenWrapper from '../../components/ui/ScreenWrapper';
-import { BorderRadius, Colors, FontSizes, Shadows, Spacing } from '../../constants/theme';
+import { BorderRadius, Colors, FontFamilies, FontSizes, Shadows, Spacing, Typography } from '../../constants/theme';
 import { useAuthStore } from '../../services/authStore';
 import { useCartStore } from '../../services/cartStore';
 import { getVerificationRoute, requiresIdentityVerification } from '../../services/verificationFlow';
@@ -23,6 +24,7 @@ export default function AppLayout() {
     return (
       <ScreenWrapper style={styles.loadingContainer}>
         <View style={styles.loadingCard}>
+          <BrandMark align="center" size="md" />
           <ActivityIndicator size="large" color={Colors.primary} />
           <Text style={styles.loadingTitle}>Preparando tu cuenta</Text>
         </View>
@@ -32,6 +34,10 @@ export default function AppLayout() {
 
   if (!isAuthenticated) {
     return <Redirect href="/(auth)/welcome" />;
+  }
+
+  if (user?.onboarding_state && user.onboarding_state !== 'active') {
+    return <Redirect href={'/(auth)/pending-access' as any} />;
   }
 
   if (requiresIdentityVerification(user) && user?.verification_status !== 'verified') {
@@ -92,6 +98,7 @@ export default function AppLayout() {
           ),
         }}
       />
+      <Tabs.Screen name="members" options={{ href: null }} />
       <Tabs.Screen name="checkout" options={{ href: null }} />
       <Tabs.Screen name="qr-access" options={{ href: null }} />
     </Tabs>
@@ -126,9 +133,11 @@ const styles = StyleSheet.create({
     paddingTop: 10,
     paddingBottom: 10,
     paddingHorizontal: 8,
-    backgroundColor: 'rgba(255,255,255,0.96)',
+    backgroundColor: 'rgba(251,247,239,0.98)',
     borderTopWidth: 0,
     borderRadius: BorderRadius.xxl,
+    borderWidth: 1,
+    borderColor: Colors.borderLight,
     ...Shadows.lg,
   },
   tabItem: {
@@ -136,6 +145,7 @@ const styles = StyleSheet.create({
   },
   tabLabel: {
     fontSize: FontSizes.xs,
+    fontFamily: FontFamilies.body,
     fontWeight: '700',
     marginBottom: 4,
   },
@@ -147,7 +157,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   iconWrapFocused: {
-    backgroundColor: Colors.primaryLight,
+    backgroundColor: Colors.primarySoftest,
   },
   badge: {
     position: 'absolute',
@@ -179,9 +189,8 @@ const styles = StyleSheet.create({
     ...Shadows.md,
   },
   loadingTitle: {
-    color: Colors.text,
+    ...Typography.h3,
     fontSize: FontSizes.xl,
-    fontWeight: '700',
     textAlign: 'center',
   },
 });

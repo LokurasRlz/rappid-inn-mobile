@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Alert, Linking, Platform, ScrollView, Share, StyleSheet, Switch, Text, TouchableOpacity, useWindowDimensions, View } from 'react-native';
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
@@ -10,15 +10,24 @@ import Card from '../../components/ui/Card';
 import Input from '../../components/ui/Input';
 import ScreenWrapper from '../../components/ui/ScreenWrapper';
 import { BorderRadius, Colors, FontFamilies, FontSizes, FontWeights, Shadows, Spacing, Typography } from '../../constants/theme';
-import { LotMemberPayload, LotMemberRole, getLotMembers, inviteLotMember, revokeLotMember, updateLotMemberLimits, updateLotMemberRole } from '../../services/api';
+import {
+  LotMemberPayload,
+  LotMemberRole,
+  getLotMembers,
+  inviteLotMember,
+  restoreLotMember,
+  revokeLotMember,
+  updateLotMemberLimits,
+  updateLotMemberRole,
+} from '../../services/api';
 import { useAuthStore } from '../../services/authStore';
 
 type MemberFilter = 'all' | 'pending' | 'active' | 'revoked';
 
-export default function ProfileScreen() {
+export default function MembersScreen() {
   const { width } = useWindowDimensions();
   const isWide = width >= 960;
-  const { logout, refreshUser, user } = useAuthStore();
+  const { refreshUser, user } = useAuthStore();
   const [members, setMembers] = useState<LotMemberPayload[]>([]);
   const [loadingMembers, setLoadingMembers] = useState(false);
   const [savingMemberId, setSavingMemberId] = useState<number | null>(null);
@@ -29,10 +38,6 @@ export default function ProfileScreen() {
   const [memberFilter, setMemberFilter] = useState<MemberFilter>('all');
 
   const canManageMembers = !!user?.current_lot_member?.can_manage_members;
-
-  useEffect(() => {
-    void refreshUser();
-  }, [refreshUser]);
 
   useEffect(() => {
     if (canManageMembers) {
@@ -136,13 +141,10 @@ export default function ProfileScreen() {
       }
 
       const canOpen = await Linking.canOpenURL(whatsappUrl);
-      if (!canOpen) {
-        throw new Error('WhatsApp no disponible');
-      }
-
+      if (!canOpen) throw new Error('WhatsApp no disponible');
       await Linking.openURL(whatsappUrl);
     } catch {
-      Alert.alert('No pudimos abrir WhatsApp', 'Puedes usar “Compartir” o “Copiar link”.');
+      Alert.alert('No pudimos abrir WhatsApp', 'Puedes usar “Reenviar” o “Copiar link”.');
     }
   }
 
@@ -150,15 +152,11 @@ export default function ProfileScreen() {
     const proceed = Platform.OS === 'web'
       ? window.confirm(`Se revocará el acceso de ${member.invited_email}.`)
       : await new Promise<boolean>((resolve) => {
-        Alert.alert(
-          'Revocar acceso',
-          `Se revocará el acceso de ${member.invited_email}.`,
-          [
+          Alert.alert('Revocar acceso', `Se revocará el acceso de ${member.invited_email}.`, [
             { text: 'Cancelar', style: 'cancel', onPress: () => resolve(false) },
             { text: 'Revocar', style: 'destructive', onPress: () => resolve(true) },
-          ],
-        );
-      });
+          ]);
+        });
 
     if (!proceed) return;
 
@@ -169,6 +167,19 @@ export default function ProfileScreen() {
       await refreshUser();
     } catch (error: any) {
       Alert.alert('No pudimos revocar el acceso', error?.response?.data?.error || 'Intenta nuevamente.');
+    } finally {
+      setSavingMemberId(null);
+    }
+  }
+
+  async function handleRestoreMember(member: LotMemberPayload) {
+    setSavingMemberId(member.id);
+    try {
+      await restoreLotMember(member.id);
+      await loadMembers();
+      await refreshUser();
+    } catch (error: any) {
+      Alert.alert('No pudimos restaurar el acceso', error?.response?.data?.error || 'Intenta nuevamente.');
     } finally {
       setSavingMemberId(null);
     }
@@ -210,149 +221,121 @@ export default function ProfileScreen() {
     }
   }
 
-  const verificationVariant =
-    user?.verification_status === 'verified'
-      ? 'verified'
-      : user?.verification_status === 'pending'
-        ? 'pending'
-      : 'unverified';
-
   const filteredMembers = members.filter((member) => memberFilter === 'all' || member.status === memberFilter);
+  const summary = useMemo(() => ({
+    pending: members.filter((member) => member.status === 'pending').length,
+    active: members.filter((member) => member.status === 'active').length,
+    revoked: members.filter((member) => member.status === 'revoked').length,
+    monthlySpend: members.reduce((sum, member) => sum + (member.monthly_spend ?? 0), 0),
+  }), [members]);
 
-  const handleLogout = () => {
-    const doLogout = async () => {
-      await logout();
-      router.replace('/(auth)/welcome');
-    };
-
-    if (Platform.OS === 'web') {
-      if (window.confirm('Tu sesión actual se cerrará en este dispositivo.')) {
-        void doLogout();
-      }
-      return;
-    }
-
-    Alert.alert('Cerrar sesión', 'Tu sesión actual se cerrará en este dispositivo.', [
-      { text: 'Cancelar', style: 'cancel' },
-      { text: 'Salir', style: 'destructive', onPress: () => void doLogout() },
-    ]);
-  };
-
-  return (
-    <ScreenWrapper>
-      <ScrollView contentContainerStyle={[styles.content, isWide && styles.contentWide]} showsVerticalScrollIndicator={false}>
-        <View style={[styles.hero, isWide && styles.wideCard]}>
-          <View style={styles.avatar}>
-            <Text style={styles.avatarText}>{user?.name?.charAt(0)?.toUpperCase() || 'M'}</Text>
-          </View>
-          <BrandMark align="center" size="md" subtitle="Tu cuenta, tu lote y las autorizaciones de tu familia en un solo lugar." />
-          <Text style={styles.heroName}>{user?.name || 'Market House'}</Text>
-          <Text style={styles.heroEmail}>{user?.email || ''}</Text>
-          <Badge variant={verificationVariant} label={user?.verification_status || 'unverified'} />
-        </View>
-
-        <Card variant="elevated" style={isWide && styles.wideCard}>
-          <Text style={styles.sectionTitle}>Estado de cuenta</Text>
-          <View style={styles.metricGrid}>
-            <InfoStat label="Rol app" value={user?.role === 'admin' ? 'Admin' : 'Cliente'} />
-            <InfoStat label="Barrio" value={user?.neighborhood?.name || 'Sin barrio'} />
-            <InfoStat label="Lote" value={user?.current_lot?.code || 'Sin lote'} />
-            <InfoStat label="Gestión" value={canManageMembers ? 'Habilitada' : 'No'} />
-          </View>
-        </Card>
-
-        {canManageMembers ? (
-          <>
-            <Card variant="elevated" style={[styles.manageCard, isWide && styles.wideCard]}>
-              <Text style={styles.sectionTitle}>Agregar familiar o invitado</Text>
-              <Text style={styles.sectionCopy}>
-                Desde acá podés autorizar quién compra en tu lote y cuánto puede gastar.
-              </Text>
-              <Input label="Email del miembro" value={inviteEmail} onChangeText={setInviteEmail} placeholder="persona@email.com" keyboardType="email-address" />
-
-              <View style={styles.roleSelector}>
-                {(['family', 'authorized'] as LotMemberRole[]).map((role) => {
-                  const selected = inviteRole === role;
-                  return (
-                    <TouchableOpacity key={role} style={[styles.roleChip, selected && styles.roleChipActive]} onPress={() => setInviteRole(role)}>
-                      <Text style={[styles.roleChipText, selected && styles.roleChipTextActive]}>
-                        {role === 'family' ? 'Familiar' : 'Invitado'}
-                      </Text>
-                    </TouchableOpacity>
-                  );
-                })}
-              </View>
-
-              <Input
-                label="Límite de gasto"
-                value={inviteLimit}
-                onChangeText={setInviteLimit}
-                placeholder="Ej: 15000"
-                keyboardType="numeric"
-                hint="Déjalo vacío si no querés fijar tope."
-              />
-
-              <Button label="Agregar miembro" onPress={() => void handleInviteMember()} loading={inviteLoading} />
-            </Card>
-
-            <Card style={isWide && styles.wideCard}>
-              <View style={styles.memberHeader}>
-                <Text style={styles.sectionTitle}>Familiares e invitados</Text>
-                <TouchableOpacity onPress={() => void loadMembers()}>
-                  <Text style={styles.refreshText}>{loadingMembers ? 'Actualizando...' : 'Actualizar'}</Text>
-                </TouchableOpacity>
-              </View>
-
-              <View style={styles.filterRow}>
-                {(['all', 'pending', 'active', 'revoked'] as MemberFilter[]).map((filter) => {
-                  const selected = memberFilter === filter;
-                  const label = filter === 'all' ? 'Todos' : filter === 'pending' ? 'Pendientes' : filter === 'active' ? 'Activos' : 'Revocados';
-                  return (
-                    <TouchableOpacity key={filter} style={[styles.filterChip, selected && styles.filterChipActive]} onPress={() => setMemberFilter(filter)}>
-                      <Text style={[styles.filterChipText, selected && styles.filterChipTextActive]}>{label}</Text>
-                    </TouchableOpacity>
-                  );
-                })}
-              </View>
-
-              {filteredMembers.map((member) => (
-                <MemberCard
-                  key={member.id}
-                  member={member}
-                  loading={savingMemberId === member.id}
-                  onRoleChange={handleRoleChange}
-                  onPermissionChange={handlePermissionChange}
-                  onCopyInvite={handleCopyInvite}
-                  onShareInvite={handleShareInvite}
-                  onWhatsAppInvite={handleWhatsAppInvite}
-                  onRevoke={handleRevokeMember}
-                />
-              ))}
-
-              {!loadingMembers && filteredMembers.length === 0 ? (
-                <Text style={styles.emptyText}>No hay miembros en este estado.</Text>
-              ) : null}
-            </Card>
-          </>
-        ) : (
-          <Card style={isWide && styles.wideCard}>
+  if (!canManageMembers) {
+    return (
+      <ScreenWrapper>
+        <ScrollView contentContainerStyle={styles.content}>
+          <Card style={styles.wideCard}>
+            <BrandMark align="center" size="sm" />
             <Text style={styles.sectionTitle}>Miembros del lote</Text>
             <Text style={styles.sectionCopy}>
               Solo el titular o un administrador con permisos puede agregar familiares, invitados y definir límites.
             </Text>
+            <Button label="Volver al perfil" variant="outline" onPress={() => router.back()} />
           </Card>
-        )}
+        </ScrollView>
+      </ScreenWrapper>
+    );
+  }
 
-        <Card style={isWide && styles.wideCard}>
-          <Text style={styles.sectionTitle}>Acciones rápidas</Text>
-          {canManageMembers ? (
-            <ActionRow icon="people-outline" title="Familiares e invitados" subtitle="Gestionar permisos, límites, invitaciones y accesos." onPress={() => router.push('/(app)/members')} />
-          ) : null}
-          <ActionRow icon="qr-code-outline" title="Acceso QR" subtitle="Entrar o salir del market del barrio." onPress={() => router.push('/(app)/qr-access')} />
-          <ActionRow icon="cart-outline" title="Carrito y checkout" subtitle="Comprar con pago directo o imputar a expensas." onPress={() => router.push('/(app)/cart')} />
+  return (
+    <ScreenWrapper>
+      <ScrollView contentContainerStyle={[styles.content, isWide && styles.contentWide]} showsVerticalScrollIndicator={false}>
+        <Card variant="elevated" style={isWide && styles.wideCard}>
+          <View style={styles.topRow}>
+            <View style={styles.topCopy}>
+              <BrandMark align="left" size="sm" subtitle="Autorizaciones, límites y estado de cada miembro del lote." />
+            </View>
+            <Button label="Volver" variant="outline" fullWidth={false} onPress={() => router.back()} />
+          </View>
+
+          <View style={styles.metricGrid}>
+            <InfoStat label="Activos" value={String(summary.active)} />
+            <InfoStat label="Pendientes" value={String(summary.pending)} />
+            <InfoStat label="Revocados" value={String(summary.revoked)} />
+            <InfoStat label="Consumo mes" value={formatCurrency(summary.monthlySpend)} />
+          </View>
         </Card>
 
-        <Button label="Cerrar sesión" variant="danger" onPress={handleLogout} />
+        <Card variant="elevated" style={[styles.manageCard, isWide && styles.wideCard]}>
+          <Text style={styles.sectionTitle}>Agregar familiar o invitado</Text>
+          <Text style={styles.sectionCopy}>
+            Desde acá podés autorizar quién compra en tu lote, si puede cargar a expensas y cuánto puede gastar.
+          </Text>
+          <Input label="Email del miembro" value={inviteEmail} onChangeText={setInviteEmail} placeholder="persona@email.com" keyboardType="email-address" />
+
+          <View style={styles.roleSelector}>
+            {(['family', 'authorized'] as LotMemberRole[]).map((role) => {
+              const selected = inviteRole === role;
+              return (
+                <TouchableOpacity key={role} style={[styles.roleChip, selected && styles.roleChipActive]} onPress={() => setInviteRole(role)}>
+                  <Text style={[styles.roleChipText, selected && styles.roleChipTextActive]}>
+                    {role === 'family' ? 'Familiar' : 'Invitado'}
+                  </Text>
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+
+          <Input
+            label="Límite de gasto"
+            value={inviteLimit}
+            onChangeText={setInviteLimit}
+            placeholder="Ej: 15000"
+            keyboardType="numeric"
+            hint="Dejalo vacío si no querés fijar tope."
+          />
+
+          <Button label="Agregar miembro" onPress={() => void handleInviteMember()} loading={inviteLoading} />
+        </Card>
+
+        <Card style={isWide && styles.wideCard}>
+          <View style={styles.memberHeader}>
+            <Text style={styles.sectionTitle}>Familiares e invitados</Text>
+            <TouchableOpacity onPress={() => void loadMembers()}>
+              <Text style={styles.refreshText}>{loadingMembers ? 'Actualizando...' : 'Actualizar'}</Text>
+            </TouchableOpacity>
+          </View>
+
+          <View style={styles.filterRow}>
+            {(['all', 'pending', 'active', 'revoked'] as MemberFilter[]).map((filter) => {
+              const selected = memberFilter === filter;
+              const label = filter === 'all' ? 'Todos' : filter === 'pending' ? 'Pendientes' : filter === 'active' ? 'Activos' : 'Revocados';
+              return (
+                <TouchableOpacity key={filter} style={[styles.filterChip, selected && styles.filterChipActive]} onPress={() => setMemberFilter(filter)}>
+                  <Text style={[styles.filterChipText, selected && styles.filterChipTextActive]}>{label}</Text>
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+
+          {filteredMembers.map((member) => (
+            <MemberCard
+              key={member.id}
+              member={member}
+              loading={savingMemberId === member.id}
+              onRoleChange={handleRoleChange}
+              onPermissionChange={handlePermissionChange}
+              onCopyInvite={handleCopyInvite}
+              onShareInvite={handleShareInvite}
+              onWhatsAppInvite={handleWhatsAppInvite}
+              onRevoke={handleRevokeMember}
+              onRestore={handleRestoreMember}
+            />
+          ))}
+
+          {!loadingMembers && filteredMembers.length === 0 ? (
+            <Text style={styles.emptyText}>No hay miembros en este estado.</Text>
+          ) : null}
+        </Card>
       </ScrollView>
     </ScreenWrapper>
   );
@@ -367,6 +350,7 @@ function MemberCard({
   onShareInvite,
   onWhatsAppInvite,
   onRevoke,
+  onRestore,
 }: {
   member: LotMemberPayload;
   loading: boolean;
@@ -376,6 +360,7 @@ function MemberCard({
   onShareInvite: (member: LotMemberPayload) => void;
   onWhatsAppInvite: (member: LotMemberPayload) => void;
   onRevoke: (member: LotMemberPayload) => void;
+  onRestore: (member: LotMemberPayload) => void;
 }) {
   const [limitValue, setLimitValue] = useState(member.spending_limit?.toString() || '');
   const statusLabel =
@@ -399,6 +384,11 @@ function MemberCard({
           </Text>
         </View>
         <Badge label={statusLabel} variant={statusVariant} />
+      </View>
+
+      <View style={styles.consumptionRow}>
+        <Text style={styles.consumptionLabel}>Consumo del mes</Text>
+        <Text style={styles.consumptionValue}>{formatCurrency(member.monthly_spend ?? 0)}</Text>
       </View>
 
       <View style={styles.roleSelector}>
@@ -459,9 +449,13 @@ function MemberCard({
         </View>
       )}
 
-      {member.role !== 'owner' ? (
-        <Button label="Revocar acceso" variant="danger" size="sm" fullWidth={false} onPress={() => void onRevoke(member)} />
-      ) : null}
+      <View style={styles.memberActions}>
+        {member.status === 'revoked' ? (
+          <Button label="Restaurar acceso" variant="secondary" size="sm" fullWidth={false} onPress={() => void onRestore(member)} />
+        ) : member.role !== 'owner' ? (
+          <Button label="Revocar acceso" variant="danger" size="sm" fullWidth={false} onPress={() => void onRevoke(member)} />
+        ) : null}
+      </View>
     </View>
   );
 }
@@ -475,29 +469,12 @@ function InfoStat({ label, value }: { label: string; value: string }) {
   );
 }
 
-function ActionRow({
-  icon,
-  title,
-  subtitle,
-  onPress,
-}: {
-  icon: keyof typeof Ionicons.glyphMap;
-  title: string;
-  subtitle: string;
-  onPress: () => void;
-}) {
-  return (
-    <TouchableOpacity style={styles.actionRow} onPress={onPress}>
-      <View style={styles.actionIcon}>
-        <Ionicons name={icon} size={18} color={Colors.primary} />
-      </View>
-      <View style={styles.actionBody}>
-        <Text style={styles.actionTitle}>{title}</Text>
-        <Text style={styles.actionSubtitle}>{subtitle}</Text>
-      </View>
-      <Ionicons name="chevron-forward" size={18} color={Colors.textMuted} />
-    </TouchableOpacity>
-  );
+function formatCurrency(amount: number) {
+  return new Intl.NumberFormat('es-AR', {
+    style: 'currency',
+    currency: 'ARS',
+    maximumFractionDigits: 0,
+  }).format(amount);
 }
 
 const styles = StyleSheet.create({
@@ -510,36 +487,14 @@ const styles = StyleSheet.create({
   contentWide: {
     alignItems: 'center',
   },
-  hero: {
-    backgroundColor: Colors.surface,
-    borderRadius: BorderRadius.xxl,
-    padding: Spacing.xl,
-    alignItems: 'center',
-    gap: Spacing.sm,
-    borderWidth: 1,
-    borderColor: Colors.borderLight,
-    ...Shadows.lg,
+  topRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    gap: Spacing.md,
   },
-  avatar: {
-    width: 82,
-    height: 82,
-    borderRadius: BorderRadius.full,
-    backgroundColor: Colors.primary,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  avatarText: {
-    color: Colors.textInverse,
-    fontSize: 30,
-    fontWeight: FontWeights.extrabold,
-  },
-  heroName: {
-    ...Typography.h2,
-  },
-  heroEmail: {
-    color: Colors.textSecondary,
-    fontFamily: FontFamilies.body,
-    fontSize: FontSizes.md,
+  topCopy: {
+    flex: 1,
   },
   sectionTitle: {
     ...Typography.h3,
@@ -557,6 +512,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: Spacing.sm,
+    marginTop: Spacing.md,
   },
   statCard: {
     width: '48%',
@@ -675,6 +631,28 @@ const styles = StyleSheet.create({
     fontFamily: FontFamilies.body,
     fontSize: FontSizes.sm,
   },
+  consumptionRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    backgroundColor: Colors.surface,
+    borderRadius: BorderRadius.lg,
+    paddingHorizontal: Spacing.md,
+    paddingVertical: Spacing.sm,
+    borderWidth: 1,
+    borderColor: Colors.borderLight,
+  },
+  consumptionLabel: {
+    color: Colors.textSecondary,
+    fontFamily: FontFamilies.body,
+    fontSize: FontSizes.sm,
+  },
+  consumptionValue: {
+    color: Colors.primary,
+    fontFamily: FontFamilies.body,
+    fontSize: FontSizes.md,
+    fontWeight: FontWeights.bold,
+  },
   switchRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -728,40 +706,15 @@ const styles = StyleSheet.create({
     fontSize: FontSizes.xs,
     fontWeight: FontWeights.semibold,
   },
+  memberActions: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: Spacing.sm,
+  },
   emptyText: {
     color: Colors.textSecondary,
     fontFamily: FontFamilies.body,
     fontSize: FontSizes.sm,
-  },
-  actionRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: Spacing.md,
-    paddingVertical: Spacing.sm,
-  },
-  actionIcon: {
-    width: 42,
-    height: 42,
-    borderRadius: BorderRadius.lg,
-    backgroundColor: Colors.primaryLight,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  actionBody: {
-    flex: 1,
-    gap: 2,
-  },
-  actionTitle: {
-    color: Colors.text,
-    fontFamily: FontFamilies.body,
-    fontSize: FontSizes.md,
-    fontWeight: FontWeights.semibold,
-  },
-  actionSubtitle: {
-    color: Colors.textSecondary,
-    fontFamily: FontFamilies.body,
-    fontSize: FontSizes.sm,
-    lineHeight: 20,
   },
   wideCard: {
     width: '100%',

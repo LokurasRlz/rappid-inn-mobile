@@ -1,10 +1,16 @@
 import React, { useRef, useState } from 'react';
 import {
-  View, Text, TextInput, Pressable,
-  StyleSheet, Animated, ViewStyle,
+  Animated,
+  Pressable,
+  StyleProp,
+  StyleSheet,
+  Text,
+  TextInput,
+  View,
+  ViewStyle,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { Colors, BorderRadius, FontSizes, FontWeights, Shadows, Layout, Durations } from '../../constants/theme';
+import { BorderRadius, Colors, Durations, FontFamilies, FontSizes, FontWeights, Layout, Shadows } from '../../constants/theme';
 
 interface InputProps {
   label: string;
@@ -19,7 +25,7 @@ interface InputProps {
   disabled?: boolean;
   multiline?: boolean;
   numberOfLines?: number;
-  style?: ViewStyle;
+  style?: StyleProp<ViewStyle>;
   maxLength?: number;
   returnKeyType?: any;
   onSubmitEditing?: () => void;
@@ -27,10 +33,23 @@ interface InputProps {
 }
 
 export default function Input({
-  label, value, onChangeText, placeholder, secureTextEntry,
-  keyboardType, autoCapitalize, error, hint, disabled,
-  multiline, numberOfLines, style, maxLength, returnKeyType,
-  onSubmitEditing, autoFocus,
+  label,
+  value,
+  onChangeText,
+  placeholder,
+  secureTextEntry,
+  keyboardType,
+  autoCapitalize,
+  error,
+  hint,
+  disabled,
+  multiline,
+  numberOfLines,
+  style,
+  maxLength,
+  returnKeyType,
+  onSubmitEditing,
+  autoFocus,
 }: InputProps) {
   const [focused, setFocused] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
@@ -76,7 +95,7 @@ export default function Input({
           style={[styles.input, multiline && styles.inputMultiline]}
           value={value}
           onChangeText={onChangeText}
-          placeholder={placeholder || `Ingresá ${label.toLowerCase()}`}
+          placeholder={placeholder || `Ingresa ${label.toLowerCase()}`}
           placeholderTextColor={Colors.textMuted}
           secureTextEntry={secureTextEntry && !showPassword}
           keyboardType={keyboardType}
@@ -91,21 +110,15 @@ export default function Input({
           onFocus={handleFocus}
           onBlur={handleBlur}
         />
-        {secureTextEntry && (
-          <Pressable onPress={() => setShowPassword(v => !v)} style={styles.eyeBtn}>
-            <Ionicons
-              name={showPassword ? 'eye-off-outline' : 'eye-outline'}
-              size={20}
-              color={focused ? Colors.primary : Colors.textMuted}
-            />
+        {secureTextEntry ? (
+          <Pressable onPress={() => setShowPassword((v) => !v)} style={styles.eyeBtn}>
+            <Ionicons name={showPassword ? 'eye-off-outline' : 'eye-outline'} size={20} color={focused ? Colors.primary : Colors.textMuted} />
           </Pressable>
-        )}
-        {!secureTextEntry && value.length > 0 && !error && focused && (
+        ) : null}
+        {!secureTextEntry && value.length > 0 && !error && focused ? (
           <Ionicons name="checkmark-circle" size={18} color={Colors.success} style={styles.statusIcon} />
-        )}
-        {error && (
-          <Ionicons name="alert-circle" size={18} color={Colors.error} style={styles.statusIcon} />
-        )}
+        ) : null}
+        {error ? <Ionicons name="alert-circle" size={18} color={Colors.error} style={styles.statusIcon} /> : null}
       </Animated.View>
       {error ? (
         <View style={styles.msgRow}>
@@ -122,16 +135,17 @@ export default function Input({
 const styles = StyleSheet.create({
   container: { gap: 6 },
   label: {
+    fontFamily: FontFamilies.body,
     fontSize: FontSizes.sm,
     fontWeight: FontWeights.semibold,
-    color: Colors.text,
-    letterSpacing: 0.1,
+    color: Colors.textSecondary,
+    letterSpacing: 0.2,
   },
   inputWrapper: {
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: Colors.surface,
-    borderRadius: BorderRadius.md,
+    borderRadius: BorderRadius.lg,
     borderWidth: Layout.borderWidth,
     borderColor: Colors.border,
     paddingHorizontal: 14,
@@ -140,17 +154,19 @@ const styles = StyleSheet.create({
   },
   inputWrapperFocused: {
     ...Shadows.sm,
+    backgroundColor: Colors.white,
   },
   inputWrapperError: {
     borderColor: Colors.error,
-    backgroundColor: Colors.errorLight + '30',
+    backgroundColor: Colors.errorLight,
   },
   inputWrapperDisabled: {
-    backgroundColor: Colors.backgroundAlt,
+    backgroundColor: Colors.surfaceMuted,
     opacity: 0.6,
   },
   input: {
     flex: 1,
+    fontFamily: FontFamilies.body,
     fontSize: FontSizes.md,
     color: Colors.text,
     paddingVertical: 14,
@@ -172,11 +188,13 @@ const styles = StyleSheet.create({
     gap: 4,
   },
   errorText: {
+    fontFamily: FontFamilies.body,
     fontSize: FontSizes.xs,
     color: Colors.error,
     fontWeight: FontWeights.medium,
   },
   hintText: {
+    fontFamily: FontFamilies.body,
     fontSize: FontSizes.xs,
     color: Colors.textMuted,
   },

@@ -1,8 +1,9 @@
 import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
 import { Redirect } from 'expo-router';
 
+import BrandMark from '../components/ui/BrandMark';
 import ScreenWrapper from '../components/ui/ScreenWrapper';
-import { Colors, FontSizes, FontWeights, Spacing } from '../constants/theme';
+import { BorderRadius, Colors, FontFamilies, FontSizes, Shadows, Spacing, Typography } from '../constants/theme';
 import { useAuthStore } from '../services/authStore';
 import { getVerificationRoute } from '../services/verificationFlow';
 
@@ -13,9 +14,10 @@ export default function Index() {
     return (
       <ScreenWrapper style={styles.loadingContainer}>
         <View style={styles.loadingCard}>
+          <BrandMark align="center" size="md" subtitle="Estamos preparando tu acceso al barrio y tu experiencia de compra." />
           <ActivityIndicator size="large" color={Colors.primary} />
-          <Text style={styles.loadingTitle}>Cargando Rapid Inn</Text>
-          <Text style={styles.loadingText}>Estamos preparando tu acceso.</Text>
+          <Text style={styles.loadingTitle}>Cargando Market House</Text>
+          <Text style={styles.loadingText}>Un momento, ya dejamos tu acceso listo.</Text>
         </View>
       </ScreenWrapper>
     );
@@ -31,18 +33,19 @@ const styles = StyleSheet.create({
   },
   loadingCard: {
     backgroundColor: Colors.surface,
-    borderRadius: 24,
+    borderRadius: BorderRadius.xl,
     padding: Spacing.xl,
     alignItems: 'center',
-    gap: Spacing.sm,
+    gap: Spacing.md,
+    ...Shadows.lg,
   },
   loadingTitle: {
-    color: Colors.text,
+    ...Typography.h3,
     fontSize: FontSizes.xl,
-    fontWeight: FontWeights.bold,
     textAlign: 'center',
   },
   loadingText: {
+    fontFamily: FontFamilies.body,
     color: Colors.textSecondary,
     fontSize: FontSizes.md,
     textAlign: 'center',

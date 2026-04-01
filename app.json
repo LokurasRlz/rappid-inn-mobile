@@ -1,20 +1,20 @@
 {
   "expo": {
-    "name": "SuperMercado App",
-    "slug": "supermarket-app",
+    "name": "Market House",
+    "slug": "market-house",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
-    "scheme": "supermarket",
+    "scheme": "markethouse",
     "userInterfaceStyle": "light",
     "splash": {
       "image": "./assets/images/splash.png",
       "resizeMode": "contain",
-      "backgroundColor": "#1B5E20"
+      "backgroundColor": "#F6F0E5"
     },
     "ios": {
       "supportsTablet": false,
-      "bundleIdentifier": "com.tuempresa.supermarketapp",
+      "bundleIdentifier": "com.tuempresa.markethouse",
       "infoPlist": {
         "NSCameraUsageDescription": "Necesitamos acceso a la camara para escanear codigos de barras y QR.",
         "NSPhotoLibraryUsageDescription": "Necesitamos acceso a tus fotos para actualizar tu perfil."
@@ -23,9 +23,9 @@
     "android": {
       "adaptiveIcon": {
         "foregroundImage": "./assets/images/adaptive-icon.png",
-        "backgroundColor": "#1B5E20"
+        "backgroundColor": "#F6F0E5"
       },
-      "package": "com.tuempresa.supermarketapp",
+      "package": "com.tuempresa.markethouse",
       "permissions": [
         "android.permission.CAMERA",
         "android.permission.INTERNET"
@@ -35,11 +35,11 @@
       "bundler": "metro",
       "output": "static",
       "favicon": "./assets/images/favicon.png",
-      "name": "SuperMercado App",
-      "shortName": "SuperApp",
-      "description": "Tu supermercado autonomo",
-      "themeColor": "#1B5E20",
-      "backgroundColor": "#FFFFFF"
+      "name": "Market House",
+      "shortName": "MARKET HOUSE",
+      "description": "Tu mercado de confianza para acceso, compra y salida con QR.",
+      "themeColor": "#234936",
+      "backgroundColor": "#F6F0E5"
     },
     "plugins": [
       "expo-router",
@@ -61,7 +61,7 @@
       "eas": {
         "projectId": "TU-EAS-PROJECT-ID"
       },
-      "apiBaseUrl": "http://192.168.3.104:3000/api/v1",
+      "apiBaseUrl": "http://192.168.68.59:3000/api/v1",
       "googleClientId": "TU_GOOGLE_CLIENT_ID.apps.googleusercontent.com",
       "mpPublicKey": "TEST-TU-MP-PUBLIC-KEY"
     }

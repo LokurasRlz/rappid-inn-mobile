@@ -5,23 +5,28 @@ import {
   StyleSheet,
   Text,
   TouchableOpacity,
+  useWindowDimensions,
   View,
 } from 'react-native';
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
-import { router } from 'expo-router';
+import { router, useLocalSearchParams } from 'expo-router';
 import Toast from 'react-native-toast-message';
 import QRCode from 'react-native-qrcode-svg';
+import Constants from 'expo-constants';
 
 import Button from '../../components/ui/Button';
-import { BorderRadius, Colors, FontSizes, FontWeights, Shadows, Spacing } from '../../constants/theme';
+import BrandMark from '../../components/ui/BrandMark';
+import { BorderRadius, Colors, FontFamilies, FontSizes, FontWeights, Shadows, Spacing, Typography } from '../../constants/theme';
 import {
   diagnoseEwelinkDevices,
+  generateAccessQr,
   getDoorStatus,
   getEwelinkAuthUrl,
   getEwelinkStatus,
   openEntryDoor,
+  openExitDoor,
   validateStoreQr,
 } from '../../services/api';
 import { useAuthStore } from '../../services/authStore';
@@ -29,20 +34,37 @@ import { useAuthStore } from '../../services/authStore';
 type DoorState = 'idle' | 'opening' | 'opened' | 'error';
 const CORNER_STYLES = ['cTL', 'cTR', 'cBL', 'cBR'] as const;
 
+function resolveBackendBaseUrl() {
+  const configuredApiUrl = Constants.expoConfig?.extra?.apiBaseUrl as string | undefined;
+
+  if (configuredApiUrl) {
+    return configuredApiUrl.replace(/\/api\/v1\/?$/, '');
+  }
+
+  return 'http://192.168.68.59:3000';
+}
+
 export default function QrAccessScreen() {
+  const { width, height } = useWindowDimensions();
+  const frameSize = Math.min(width < 430 ? 210 : 260, width - 72);
   const [permission, requestPermission] = useCameraPermissions();
   const [doorState, setDoorState] = useState<DoorState>('idle');
   const [scanned, setScanned] = useState(false);
   const [accessReady, setAccessReady] = useState(false);
   const [lastQrData, setLastQrData] = useState<string | null>(null);
-  const [storeCode, setStoreCode] = useState('rapid-inn-main');
+  const [accessToken, setAccessToken] = useState<string | null>(null);
+  const [accessExpiresAt, setAccessExpiresAt] = useState<string | null>(null);
+  const [storeCode, setStoreCode] = useState('market-house-main');
   const [loadingStoreCode, setLoadingStoreCode] = useState(true);
   const [showEntryQr, setShowEntryQr] = useState(false);
-  const [setupUrl, setSetupUrl] = useState('http://192.168.3.104:3000/ewelink_setup');
+  const [setupUrl, setSetupUrl] = useState(`${resolveBackendBaseUrl()}/ewelink_setup`);
   const { user } = useAuthStore();
+  const params = useLocalSearchParams<{ mode?: string; orderId?: string }>();
+  const mode = params.mode === 'exit' ? 'exit' : 'entry';
+  const exitOrderId = params.orderId ? Number(params.orderId) : undefined;
 
   const canOpenDoor = user?.role === 'admin' || user?.verification_status === 'verified';
-  const entryQrValue = useMemo(() => `rapid-inn:store:${storeCode}:entry`, [storeCode]);
+  const entryQrValue = useMemo(() => `market-house:store:${storeCode}:entry`, [storeCode]);
 
   useEffect(() => {
     loadDoorStatus();
@@ -146,6 +168,8 @@ export default function QrAccessScreen() {
       setScanned(false);
       setAccessReady(false);
       setLastQrData(null);
+      setAccessToken(null);
+      setAccessExpiresAt(null);
       setDoorState('idle');
     }, delayMs);
   };
@@ -157,14 +181,19 @@ export default function QrAccessScreen() {
     setDoorState('opening');
 
     try {
-      await validateStoreQr('entry', data, undefined, 'entry-qr-scan-validation');
+      const generated = await generateAccessQr(mode, exitOrderId, data, `${mode}-qr-generation`);
+      const token = generated.data.data.access_token as string;
+      const expiresAt = generated.data.data.expires_at as string;
+      await validateStoreQr(mode, token, data, exitOrderId, `${mode}-qr-scan-validation`);
       setAccessReady(true);
       setLastQrData(data);
+      setAccessToken(token);
+      setAccessExpiresAt(expiresAt);
       setDoorState('idle');
       Toast.show({
         type: 'success',
         text1: 'QR valido',
-        text2: 'Ahora puedes tocar Abrir puerta',
+        text2: mode === 'exit' ? 'Salida autorizada. Ahora puedes abrir la puerta.' : 'Entrada autorizada. Ahora puedes abrir la puerta.',
       });
     } catch (error: any) {
       setDoorState('error');
@@ -181,11 +210,25 @@ export default function QrAccessScreen() {
     setDoorState('opening');
 
     try {
-      await openEntryDoor(lastQrData || undefined, accessReady ? 'entry-qr-button' : 'manual-entry-button');
+      let token = accessToken;
+      if (!token) {
+        const generated = await generateAccessQr(mode, exitOrderId, lastQrData || undefined, `${mode}-manual-generation`);
+        token = generated.data.data.access_token as string;
+        setAccessToken(token);
+        setAccessExpiresAt(generated.data.data.expires_at as string);
+        await validateStoreQr(mode, token, lastQrData || '', exitOrderId, `${mode}-manual-validation`);
+      }
+
+      if (mode === 'exit' && exitOrderId) {
+        await openExitDoor(exitOrderId, token, lastQrData || undefined, accessReady ? 'exit-qr-button' : 'manual-exit-button');
+      } else {
+        await openEntryDoor(token, lastQrData || undefined, accessReady ? 'entry-qr-button' : 'manual-entry-button');
+      }
+
       setDoorState('opened');
       Toast.show({
         type: 'success',
-        text1: 'Puerta habilitada',
+        text1: mode === 'exit' ? 'Salida habilitada' : 'Puerta habilitada',
         text2: 'La senal se envio al Sonoff',
       });
       resetDoorState(5000);
@@ -210,8 +253,9 @@ export default function QrAccessScreen() {
           <Ionicons name="arrow-back" size={20} color={Colors.textSecondary} />
           <Text style={styles.backText}>Volver</Text>
         </TouchableOpacity>
-        <View style={styles.blockedContent}>
-          <View style={styles.blockedIcon}>
+          <View style={styles.blockedContent}>
+            <BrandMark align="center" size="md" />
+            <View style={styles.blockedIcon}>
             <Ionicons name="lock-closed" size={48} color={Colors.textMuted} />
           </View>
           <Text style={styles.blockedTitle}>Acceso restringido</Text>
@@ -227,8 +271,9 @@ export default function QrAccessScreen() {
   if (!permission?.granted) {
     return (
       <SafeAreaView style={styles.container} edges={['top']}>
-        <View style={styles.blockedContent}>
-          <Ionicons name="camera-outline" size={56} color={Colors.primary} />
+          <View style={styles.blockedContent}>
+            <BrandMark align="center" size="md" />
+            <Ionicons name="camera-outline" size={56} color={Colors.primary} />
           <Text style={styles.blockedTitle}>Camara necesaria</Text>
           <Text style={styles.blockedSubtitle}>
             Necesitamos acceso a la camara para leer el QR de la puerta.
@@ -259,7 +304,7 @@ export default function QrAccessScreen() {
           </View>
 
           <View style={styles.scanArea}>
-            <View style={styles.qrFrame}>
+            <View style={[styles.qrFrame, { width: frameSize, height: frameSize }]}>
               {CORNER_STYLES.map((cornerStyle) => (
                 <View key={cornerStyle} style={[styles.corner, styles[cornerStyle]]} />
               ))}
@@ -280,25 +325,31 @@ export default function QrAccessScreen() {
               )}
             </View>
             <Text style={styles.scanHint}>
-              {doorState === 'idle' && !accessReady && 'Escanea el QR de entrada'}
-              {doorState === 'idle' && accessReady && 'QR validado. Puedes abrir la puerta'}
+              {doorState === 'idle' && !accessReady && (mode === 'exit' ? 'Escanea el QR de salida' : 'Escanea el QR de entrada')}
+              {doorState === 'idle' && accessReady && (mode === 'exit' ? 'QR de salida validado. Puedes abrir la puerta' : 'QR de entrada validado. Puedes abrir la puerta')}
               {doorState === 'opening' && 'Enviando autorizacion...'}
-              {doorState === 'opened' && 'Puerta habilitada'}
+              {doorState === 'opened' && (mode === 'exit' ? 'Salida habilitada' : 'Puerta habilitada')}
               {doorState === 'error' && 'Acceso denegado'}
             </Text>
           </View>
         </SafeAreaView>
       </CameraView>
 
-      <View style={styles.bottomSheet}>
+      <View style={[styles.bottomSheet, { maxHeight: height * (width >= 960 ? 0.52 : 0.46) }]}>
         <ScrollView contentContainerStyle={styles.bottomContent} showsVerticalScrollIndicator={false}>
           <View style={styles.ctaCard}>
-            <Text style={styles.ctaTitle}>Abrir puerta desde la app</Text>
+            <BrandMark align="center" size="md" subtitle={mode === 'exit' ? 'Salida tranquila, validada y de un solo uso.' : 'Ingreso tranquilo, validado y de un solo uso.'} />
+            <Text style={styles.ctaTitle}>{mode === 'exit' ? 'Salir desde la app' : 'Abrir puerta desde la app'}</Text>
             <Text style={styles.ctaSubtitle}>
-              Si ya estas autenticado, tambien podes mandar la senal manualmente sin escanear.
+              {mode === 'exit'
+                ? 'Validamos una sesion corta y de un solo uso antes de habilitar la salida por QR.'
+                : 'Validamos una sesion corta y de un solo uso antes de habilitar la entrada por QR.'}
             </Text>
+            {accessExpiresAt && (
+              <Text style={styles.sessionHint}>Sesion valida hasta: {new Date(accessExpiresAt).toLocaleTimeString()}</Text>
+            )}
             <Button
-              label={doorState === 'opening' ? 'Abriendo...' : accessReady ? 'Abrir puerta' : 'Abrir puerta manualmente'}
+              label={doorState === 'opening' ? 'Abriendo...' : accessReady ? (mode === 'exit' ? 'Abrir salida' : 'Abrir puerta') : (mode === 'exit' ? 'Preparar salida' : 'Abrir puerta manualmente')}
               onPress={handleManualOpen}
               loading={doorState === 'opening'}
               disabled={doorState === 'opening'}
@@ -312,12 +363,13 @@ export default function QrAccessScreen() {
 
           {user?.role === 'admin' && (
             <View style={styles.adminPanel}>
+              <BrandMark size="md" />
               <Text style={styles.adminPanelTitle}>Panel Admin</Text>
               <Text style={styles.adminPanelHint}>
                 Para conectar eWeLink abre esta URL en el navegador y completa el login una sola vez:
               </Text>
               <Text style={styles.adminPanelCode}>{setupUrl}</Text>
-              <Text style={styles.adminPanelCode}>QR imprimible: http://192.168.3.104:3000/door_qr/entry</Text>
+              <Text style={styles.adminPanelCode}>QR imprimible: {`${resolveBackendBaseUrl()}/door_qr/entry`}</Text>
               <TouchableOpacity style={styles.debugBtn} onPress={checkEwelinkStatus}>
                 <Text style={styles.debugBtnText}>Ver estado del token</Text>
               </TouchableOpacity>
@@ -330,6 +382,7 @@ export default function QrAccessScreen() {
           <View style={styles.qrCard}>
             <View style={styles.qrHeader}>
               <View>
+                <BrandMark size="md" />
                 <Text style={styles.qrTitle}>QR de entrada</Text>
                 <Text style={styles.qrSubtitle}>Usalo para habilitar ingreso en pruebas o para imprimir.</Text>
               </View>
@@ -389,16 +442,16 @@ const styles = StyleSheet.create({
     width: 96,
     height: 96,
     borderRadius: 28,
-    backgroundColor: Colors.backgroundAlt,
+    backgroundColor: Colors.surfaceMuted,
     alignItems: 'center',
     justifyContent: 'center',
   },
   blockedTitle: {
+    ...Typography.h3,
     fontSize: FontSizes.xl,
-    fontWeight: FontWeights.extrabold,
-    color: Colors.text,
   },
   blockedSubtitle: {
+    fontFamily: FontFamilies.body,
     fontSize: FontSizes.md,
     color: Colors.textSecondary,
     textAlign: 'center',
@@ -414,13 +467,13 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     paddingHorizontal: Spacing.lg,
     paddingVertical: Spacing.md,
-    backgroundColor: 'rgba(0,0,0,0.28)',
+    backgroundColor: Colors.overlay,
   },
   closeBtn: {
     width: 40,
     height: 40,
     borderRadius: 12,
-    backgroundColor: 'rgba(0,0,0,0.3)',
+    backgroundColor: 'rgba(33, 51, 40, 0.42)',
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -428,14 +481,14 @@ const styles = StyleSheet.create({
     width: 40,
     height: 40,
     borderRadius: 12,
-    backgroundColor: 'rgba(0,0,0,0.3)',
+    backgroundColor: 'rgba(33, 51, 40, 0.42)',
     alignItems: 'center',
     justifyContent: 'center',
   },
   headerTitle: {
-    color: '#fff',
+    color: Colors.textInverse,
+    fontFamily: FontFamilies.editorial,
     fontSize: FontSizes.lg,
-    fontWeight: FontWeights.bold,
   },
   scanArea: {
     flex: 1,
@@ -445,8 +498,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: Spacing.lg,
   },
   qrFrame: {
-    width: 220,
-    height: 220,
     position: 'relative',
     alignItems: 'center',
     justifyContent: 'center',
@@ -455,7 +506,7 @@ const styles = StyleSheet.create({
     position: 'absolute',
     width: 28,
     height: 28,
-    borderColor: '#fff',
+    borderColor: Colors.accentLight,
     borderRadius: 3,
   },
   cTL: {
@@ -496,15 +547,15 @@ const styles = StyleSheet.create({
     backgroundColor: `${Colors.errorLight}D9`,
   },
   scanHint: {
-    color: '#fff',
+    color: Colors.textInverse,
+    fontFamily: FontFamilies.body,
     fontSize: FontSizes.md,
     fontWeight: FontWeights.semibold,
     textAlign: 'center',
     opacity: 0.95,
   },
   bottomSheet: {
-    maxHeight: '42%',
-    backgroundColor: Colors.background,
+    backgroundColor: Colors.surface,
     borderTopLeftRadius: 28,
     borderTopRightRadius: 28,
     marginTop: -18,
@@ -519,20 +570,29 @@ const styles = StyleSheet.create({
     borderRadius: BorderRadius.xl,
     padding: Spacing.lg,
     gap: Spacing.md,
+    borderWidth: 1,
+    borderColor: Colors.borderLight,
     ...Shadows.md,
   },
   ctaTitle: {
-    color: Colors.text,
+    ...Typography.h3,
     fontSize: FontSizes.lg,
-    fontWeight: FontWeights.extrabold,
   },
   ctaSubtitle: {
     color: Colors.textSecondary,
+    fontFamily: FontFamilies.body,
     fontSize: FontSizes.sm,
     lineHeight: 20,
   },
+  sessionHint: {
+    color: Colors.textMuted,
+    fontFamily: FontFamilies.body,
+    fontSize: FontSizes.xs,
+    fontWeight: FontWeights.medium,
+  },
   resetLink: {
     color: Colors.primary,
+    fontFamily: FontFamilies.body,
     fontSize: FontSizes.sm,
     fontWeight: FontWeights.semibold,
     textAlign: 'center',
@@ -542,6 +602,8 @@ const styles = StyleSheet.create({
     borderRadius: BorderRadius.xl,
     padding: Spacing.lg,
     gap: Spacing.md,
+    borderWidth: 1,
+    borderColor: Colors.borderLight,
     ...Shadows.md,
   },
   qrHeader: {
@@ -551,12 +613,12 @@ const styles = StyleSheet.create({
     gap: Spacing.md,
   },
   qrTitle: {
-    color: Colors.text,
+    ...Typography.h3,
     fontSize: FontSizes.lg,
-    fontWeight: FontWeights.extrabold,
   },
   qrSubtitle: {
     color: Colors.textSecondary,
+    fontFamily: FontFamilies.body,
     fontSize: FontSizes.sm,
     lineHeight: 20,
     marginTop: 4,
@@ -566,7 +628,7 @@ const styles = StyleSheet.create({
     width: 34,
     height: 34,
     borderRadius: BorderRadius.full,
-    backgroundColor: Colors.background,
+    backgroundColor: Colors.surface,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -578,36 +640,39 @@ const styles = StyleSheet.create({
   },
   qrCodeValue: {
     color: Colors.textSecondary,
+    fontFamily: FontFamilies.body,
     fontSize: FontSizes.xs,
     textAlign: 'center',
     lineHeight: 18,
   },
   adminPanel: {
-    backgroundColor: '#FFFDE7',
+    backgroundColor: Colors.warningLight,
     borderRadius: BorderRadius.xl,
     padding: Spacing.lg,
     gap: Spacing.sm,
     borderWidth: 1,
-    borderColor: '#FFD54F',
+    borderColor: Colors.accent,
   },
   adminPanelTitle: {
     fontSize: FontSizes.xs,
+    fontFamily: FontFamilies.body,
     fontWeight: FontWeights.bold,
-    color: '#7B6000',
+    color: Colors.warningDark,
     textTransform: 'uppercase',
     letterSpacing: 0.8,
     marginBottom: 4,
   },
   adminPanelHint: {
     fontSize: FontSizes.xs,
-    color: '#7B6000',
+    fontFamily: FontFamilies.body,
+    color: Colors.warningDark,
     lineHeight: 18,
   },
   adminPanelCode: {
     fontSize: FontSizes.xs,
-    color: '#5C4300',
+    color: Colors.warningDark,
     fontWeight: FontWeights.medium,
-    fontFamily: 'monospace',
+    fontFamily: FontFamilies.mono,
     backgroundColor: 'rgba(0,0,0,0.04)',
     borderRadius: BorderRadius.md,
     padding: Spacing.sm,
@@ -620,7 +685,8 @@ const styles = StyleSheet.create({
   },
   debugBtnText: {
     fontSize: FontSizes.sm,
-    color: '#5C4300',
+    fontFamily: FontFamilies.body,
+    color: Colors.warningDark,
     fontWeight: FontWeights.semibold,
   },
 });
