@@ -41,7 +41,7 @@ function resolveBackendBaseUrl() {
     return configuredApiUrl.replace(/\/api\/v1\/?$/, '');
   }
 
-  return 'http://192.168.68.59:3000';
+  return 'http://192.168.3.104:3000';
 }
 
 export default function QrAccessScreen() {

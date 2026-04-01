@@ -55,7 +55,7 @@ async function getStoredInviteContext() {
 
 function resolveApiUrl() {
   const configuredUrl = Constants.expoConfig?.extra?.apiBaseUrl as string | undefined;
-  const fallbackNative = 'http://192.168.68.59:3000/api/v1';
+  const fallbackNative = 'http://192.168.3.104:3000/api/v1';
   const fallbackWeb = 'http://127.0.0.1:3000/api/v1';
 
   if (Platform.OS === 'web') {
